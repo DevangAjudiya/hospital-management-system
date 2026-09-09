@@ -30,14 +30,14 @@ function getAuthHeader() {
  * Starts a new interview session.
  * Routed through: POST /api/kiosk/interview (consent-gated Node proxy)
  */
-export async function startInterview(language = 'en', assessmentType = 'modern') {
+export async function startInterview(language = 'en', assessmentType = 'modern', initialComplaint = '', inputMode = 'touch') {
   const payload = {
-    input_mode: 'touch',
+    input_mode: inputMode || 'touch',
     language: language || 'en',
     assessment_type: assessmentType || 'modern',
     ayush_assessments: assessmentType === 'ayush' ? ['dashavidha_pariksha'] : [],
     patient_id: null,
-    patient_message: ''
+    patient_message: initialComplaint || ""
   };
 
   const response = await fetch(`${BACKEND_URL}/api/kiosk/interview`, {

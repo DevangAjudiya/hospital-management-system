@@ -1,14 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  FaHospital,
   FaArrowLeft,
-  FaAmbulance,
-  FaClock,
   FaRedo,
   FaSpinner,
   FaStethoscope,
-  FaCheck
+  FaCheck,
+  FaArrowRight
 } from 'react-icons/fa';
 import { useInterview } from '../hooks/useInterview';
 import { generateSummary } from '../../summary-generator/services/summaryApi';
@@ -18,31 +16,15 @@ import RetryNote from '../components/RetryNote';
 import InterviewCompletion from '../components/InterviewCompletion';
 import KioskNavbar from '../components/KioskNavbar';
 import VoiceRecorder from '../components/VoiceRecorder';
+import { getKioskStrings, getLocalizedPhaseMeta } from '../utils/kioskLocalization';
 
 const PHASES = [
-  { key: 'chief_complaint', label: 'Chief Complaint' },
-  { key: 'hpi', label: 'Present Illness' },
-  { key: 'extended_history', label: 'Medical History' },
-  { key: 'ros', label: 'Systems Review' },
-  { key: 'ayush', label: 'AYUSH Care' }
+  { key: 'chief_complaint' },
+  { key: 'hpi' },
+  { key: 'extended_history' },
+  { key: 'ros' },
+  { key: 'ayush' }
 ];
-
-const getPhaseMeta = (sectionKey) => {
-  switch (sectionKey) {
-    case 'chief_complaint':
-      return { title: 'Chief Complaint', subtitle: 'Describe your primary health concern' };
-    case 'hpi':
-      return { title: 'History of Present Illness (HPI)', subtitle: 'Understanding your symptom patterns, onset, and duration' };
-    case 'extended_history':
-      return { title: 'Medical History & Background', subtitle: 'Prior conditions, routine medications, and allergies' };
-    case 'ros':
-      return { title: 'Review of Systems', subtitle: 'Checking general body systems and associated symptoms' };
-    case 'ayush':
-      return { title: 'AYUSH Constitutional Evaluation', subtitle: 'Holistic lifestyle and physiological assessment' };
-    default:
-      return { title: sectionKey ? sectionKey.toUpperCase().replace(/_/g, ' ') : 'Intake Consultation', subtitle: 'Clinical evaluation in progress' };
-  }
-};
 
 export default function KioskInterview() {
   const navigate = useNavigate();
@@ -51,10 +33,13 @@ export default function KioskInterview() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const patientId = location.state?.patientId || localStorage.getItem("hmsPatientId") || user.patientId || null;
 
-  const selectedLanguage = location.state?.language || 'en';
+  const selectedLanguage = location.state?.language || localStorage.getItem('kiosk_language') || 'en';
   const assessmentType = location.state?.assessmentType || 'modern';
 
-  const [isInitialComplaint, setIsInitialComplaint] = useState(true);
+  const [textComplaint, setTextComplaint] = useState('');
+
+  // Localized strings dictionary for the chosen language
+  const strings = getKioskStrings(selectedLanguage);
 
   // Guard against duplicate summary generation (StrictMode / re-renders)
   const summaryGenerationStartedRef = useRef(new Set());
@@ -69,6 +54,7 @@ export default function KioskInterview() {
     currentQuestion,
     isLoading,
     isTranscribing,
+    isAiSpeaking,
     error,
     interviewComplete,
     redFlagDetected,
@@ -78,17 +64,18 @@ export default function KioskInterview() {
     startInterview,
     submitAnswer,
     submitVoiceAnswer,
+    stopSpeaking,
     retryLastAction,
     resetInterview
-  } = useInterview();
+  } = useInterview(selectedLanguage);
 
-  // Start interview on mount using chosen language
+  // Reset interview state on unmount
   useEffect(() => {
-    startInterview(selectedLanguage, assessmentType);
     return () => {
+      stopSpeaking();
       resetInterview();
     };
-  }, [startInterview, resetInterview, selectedLanguage, assessmentType]);
+  }, [resetInterview, stopSpeaking]);
 
   // Handoff to summary module once interview is completed
   const triggerSummaryGeneration = useCallback((summaryData, pid, sid) => {
@@ -169,21 +156,24 @@ export default function KioskInterview() {
   }, [interviewComplete, clinicalSummary, patientId, sessionId, triggerSummaryGeneration]);
 
   const handleReturnHome = () => {
+    stopSpeaking();
     resetInterview();
-    navigate('/kiosk');
+    navigate('/kiosk', { state: { language: selectedLanguage } });
   };
 
   const handleTouchSubmit = async (answer) => {
-    await submitAnswer(answer, 'touch');
-    setIsInitialComplaint(false);
+    stopSpeaking();
+    await submitAnswer(answer, 'touch', selectedLanguage);
   };
-  const handleVoiceSubmit = async (audioBlob) => {
-    await submitVoiceAnswer(audioBlob);
-    setIsInitialComplaint(false);
+
+  const handleTextComplaintSubmit = async () => {
+    if (!textComplaint.trim() || isLoading || isTranscribing || isAiSpeaking) return;
+    stopSpeaking();
+    await startInterview(selectedLanguage, assessmentType, textComplaint.trim(), 'touch');
   };
 
   const currentSection = currentQuestion?.section || 'chief_complaint';
-  const phaseMeta = getPhaseMeta(currentSection);
+  const phaseMeta = getLocalizedPhaseMeta(currentSection, selectedLanguage);
 
   // Find index of current phase for dynamic progress indicator
   const activePhaseIndex = PHASES.findIndex(p => p.key === currentSection);
@@ -199,8 +189,8 @@ export default function KioskInterview() {
           .teal-grad { background: linear-gradient(135deg, #0d9488, #14b8a6, #2dd4bf); }
         `}</style>
 
-        {/* Hospital Branding Header & Emergency Bar */}
-        <KioskNavbar topBarTag="Consultation Intake Desk" />
+        {/* Hospital Branding Header */}
+        <KioskNavbar topBarTag={strings.intakeDesk} />
 
         {/* Completion Main View */}
         <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-8 flex flex-col justify-center">
@@ -212,6 +202,7 @@ export default function KioskInterview() {
             patientId={patientId}
             onRetrySummary={() => triggerSummaryGeneration(clinicalSummary, patientId, sessionId)}
             onReset={resetInterview}
+            language={selectedLanguage}
           />
         </main>
       </div>
@@ -228,9 +219,9 @@ export default function KioskInterview() {
         .card-hover { transition: all 0.2s ease-in-out; }
       `}</style>
 
-      {/* Hospital Branding Header & Emergency Bar */}
+      {/* Hospital Branding Header */}
       <KioskNavbar
-        topBarTag="Touch-Mode Patient Consultation"
+        topBarTag={strings.consultationTitle}
         rightAction={
           <button
             type="button"
@@ -238,7 +229,7 @@ export default function KioskInterview() {
             className="flex items-center gap-2 px-4 py-2 border-2 border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-800 hover:bg-slate-100 font-bold rounded-xl text-sm transition-all cursor-pointer"
           >
             <FaArrowLeft className="text-xs" />
-            <span>Exit Consultation</span>
+            <span>{strings.exitConsultation}</span>
           </button>
         }
       />
@@ -247,6 +238,7 @@ export default function KioskInterview() {
       <div className="bg-white/80 border-b border-slate-200/80 px-6 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between overflow-x-auto gap-2 py-1 scrollbar-none">
           {PHASES.map((p, idx) => {
+            const pMeta = getLocalizedPhaseMeta(p.key, selectedLanguage);
             const isCurrent = p.key === currentSection;
             const isCompleted = activePhaseIndex > idx;
             return (
@@ -266,7 +258,7 @@ export default function KioskInterview() {
                       {idx + 1}
                     </span>
                   )}
-                  <span>{p.label}</span>
+                  <span>{pMeta.title}</span>
                 </div>
                 {idx < PHASES.length - 1 && (
                   <div className={`w-4 sm:w-8 h-0.5 ${isCompleted ? 'bg-teal-300' : 'bg-slate-200'}`} />
@@ -283,7 +275,7 @@ export default function KioskInterview() {
         {error && (
           <div className="bg-rose-50 border-2 border-rose-200 text-rose-800 rounded-2xl p-5 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="text-sm font-semibold">
-              <strong className="block text-rose-900 font-bold mb-0.5">Connection Notice</strong>
+              <strong className="block text-rose-900 font-bold mb-0.5">{strings.connectionNotice}</strong>
               {error}
             </div>
             <button
@@ -292,31 +284,103 @@ export default function KioskInterview() {
               className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer"
             >
               <FaRedo className="text-xs" />
-              <span>Retry</span>
+              <span>{strings.retry}</span>
             </button>
           </div>
         )}
 
-        {/* Initial Connecting State */}
-        {isLoading && !currentQuestion && (
-          <div className="bg-white rounded-3xl border border-teal-100 shadow-sm p-12 text-center my-6">
-            <div className="w-16 h-16 rounded-2xl teal-grad flex items-center justify-center text-white text-2xl mx-auto mb-5 shadow-lg shadow-teal-300/40 animate-pulse">
-              <FaStethoscope />
+        {/* 1. Initial Complaint Screen (Before any question is generated) */}
+        {!currentQuestion && (
+          <div className="bg-white rounded-3xl border border-teal-100 shadow-sm p-6 sm:p-10 relative overflow-hidden transition-all duration-200">
+            {/* Top Phase Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                  <FaStethoscope className="text-[11px]" />
+                  <span>{phaseMeta.title}</span>
+                </div>
+                <div className="text-xs text-slate-400 font-semibold mt-1">
+                  {phaseMeta.subtitle}
+                </div>
+              </div>
             </div>
-            <h3 className="font-display text-xl font-bold text-slate-800 mb-2">
-              Preparing Your Consultation
-            </h3>
-            <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
-              Connecting securely to the MultiSpecialist clinical evaluation engine...
+
+            {/* In-Flight Submitting Banner */}
+            {isLoading && (
+              <div className="absolute inset-x-0 top-0 bg-teal-600/90 text-white text-xs font-bold py-1.5 px-4 text-center flex items-center justify-center gap-2 z-20 backdrop-blur-xs transition-all">
+                <FaSpinner className="animate-spin text-xs" />
+                <span>{strings.submittingComplaint}</span>
+              </div>
+            )}
+
+            {/* Initial Complaint Prompt */}
+            <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800 leading-snug mb-2">
+              {strings.tellUsHealthProblem}
+            </h2>
+            <p className="text-slate-500 text-sm sm:text-base mb-6">
+              {strings.describeInOwnWords}
             </p>
-            <div className="inline-flex items-center gap-2 text-teal-600 font-bold text-sm bg-teal-50 px-4 py-2 rounded-xl">
-              <FaSpinner className="animate-spin text-base" />
-              <span>Loading next question...</span>
+
+            {/* Option A: 🎤 Voice Input */}
+            <div className="mb-6">
+              <div className="text-xs font-bold text-teal-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span>{strings.optionVoice}</span>
+              </div>
+              <VoiceRecorder
+                onVoiceSubmit={(audioBlob) => submitVoiceAnswer(audioBlob, selectedLanguage)}
+                isTranscribing={isTranscribing}
+                isAiSpeaking={isAiSpeaking}
+                disabled={isLoading || isTranscribing || isAiSpeaking}
+                language={selectedLanguage}
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {strings.orTypeBelow}
+              </span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
+
+            {/* Option B: ⌨️ Text Input */}
+            <div className="space-y-4">
+              <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <span>{strings.optionText}</span>
+              </div>
+              <div className="relative">
+                <textarea
+                  value={textComplaint}
+                  onChange={(e) => setTextComplaint(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleTextComplaintSubmit();
+                    }
+                  }}
+                  placeholder={strings.typePlaceholder}
+                  disabled={isLoading || isTranscribing || isAiSpeaking}
+                  rows={4}
+                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 text-base sm:text-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:bg-white transition-all resize-none shadow-inner"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleTextComplaintSubmit}
+                  disabled={!textComplaint.trim() || isLoading || isTranscribing || isAiSpeaking}
+                  className="px-6 py-3.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-2xl text-base shadow-md shadow-teal-300/40 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center gap-3 cursor-pointer"
+                >
+                  <span>{strings.continueConsultation}</span>
+                  <FaArrowRight className="text-sm" />
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Current Active Question Card */}
+        {/* 2. Active AI Question Card (For all subsequent questions) */}
         {currentQuestion && (
           <div className="bg-white rounded-3xl border border-teal-100 shadow-sm p-6 sm:p-10 relative overflow-hidden transition-all duration-200">
             {/* Top Phase Header */}
@@ -333,7 +397,7 @@ export default function KioskInterview() {
 
               {sessionId && (
                 <div className="text-[11px] text-slate-400 font-mono hidden sm:block">
-                  Session: {sessionId.slice(0, 8)}...
+                  {strings.session}: {sessionId.slice(0, 8)}...
                 </div>
               )}
             </div>
@@ -342,11 +406,19 @@ export default function KioskInterview() {
             {isLoading && (
               <div className="absolute inset-x-0 top-0 bg-teal-600/90 text-white text-xs font-bold py-1.5 px-4 text-center flex items-center justify-center gap-2 z-20 backdrop-blur-xs transition-all">
                 <FaSpinner className="animate-spin text-xs" />
-                <span>Recording your answer...</span>
+                <span>{strings.recordingAnswer}</span>
               </div>
             )}
 
-            {/* Question Text */}
+            {/* Speaking State Banner */}
+            {isAiSpeaking && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold animate-pulse mb-3">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+                <span>{strings.aiSpeaking}</span>
+              </div>
+            )}
+
+            {/* Question Text (Generated in selected language by AI backend) */}
             <h2 className="font-display text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800 leading-snug mb-3">
               {currentQuestion.question}
             </h2>
@@ -356,34 +428,32 @@ export default function KioskInterview() {
               <RetryNote note={currentQuestion.note} />
             )}
 
-            {/* Voice Capture Option - Initial Complaint Only */}
-            {isInitialComplaint && (
-              <>
-                <div className="mt-6 mb-4">
-                  <VoiceRecorder
-                    onVoiceSubmit={handleVoiceSubmit}
-                    isTranscribing={isTranscribing}
-                    disabled={isLoading || isTranscribing}
-                  />
-                </div>
+            {/* Voice Capture Option - Available for every question */}
+            <div className="mt-6 mb-4">
+              <VoiceRecorder
+                onVoiceSubmit={(audioBlob) => submitVoiceAnswer(audioBlob, selectedLanguage)}
+                isTranscribing={isTranscribing}
+                isAiSpeaking={isAiSpeaking}
+                disabled={isLoading || isTranscribing || isAiSpeaking}
+                language={selectedLanguage}
+              />
+            </div>
 
-                {/* Subtle Divider: Voice or Touch */}
-                <div className="flex items-center gap-4 my-6">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Or answer with touch below
-                  </span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
-              </>
-            )}
+            {/* Subtle Divider: Voice or Touch */}
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {strings.orAnswerTouch}
+              </span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
 
             {/* Touch Question Option Input Widgets */}
             <div className="mt-2">
               <QuestionRenderer
                 question={currentQuestion}
                 onSubmit={handleTouchSubmit}
-                disabled={isLoading || isTranscribing}
+                disabled={isLoading || isTranscribing || isAiSpeaking}
               />
             </div>
           </div>

@@ -2,7 +2,7 @@ import React from 'react';
 import { FaHospital, FaAmbulance, FaClock } from 'react-icons/fa';
 
 export default function KioskNavbar({
-  topBarTag = 'Touch-Mode Patient Consultation',
+  topBarTag = 'Patient Consultation',
   rightAction = null
 }) {
   return (

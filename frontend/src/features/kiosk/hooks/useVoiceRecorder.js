@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { convertBlobToWav } from '../utils/audioConverter';
+import { getKioskStrings } from '../utils/kioskLocalization';
 
 const MIME_CANDIDATES = [
   { mimeType: 'audio/webm;codecs=opus', extension: 'webm' },
@@ -21,7 +22,7 @@ export function getSupportedMimeType() {
   return null;
 }
 
-export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
+export function useVoiceRecorder({ onRecordingComplete, isTranscribing, language = 'en' }) {
   // recorderState: 'idle' | 'requesting' | 'recording' | 'processing' | 'error'
   const [recorderState, setRecorderState] = useState('idle');
   const [errorMessage, setErrorMessage] = useState(null);
@@ -32,6 +33,8 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
   const audioContextRef = useRef(null);
   const chunksRef = useRef([]);
   const selectedMimeRef = useRef(null);
+
+  const localized = getKioskStrings(language);
 
   // Safely stop tracks and close AudioContext
   const cleanupMediaResources = useCallback(() => {
@@ -72,14 +75,14 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
     // 1. Verify MediaRecorder & getUserMedia support
     if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setRecorderState('error');
-      setErrorMessage('Microphone access is not supported on this browser. Please use touch options.');
+      setErrorMessage(localized.micNotSupported);
       return;
     }
 
     const supportedMime = getSupportedMimeType();
     if (!supportedMime) {
       setRecorderState('error');
-      setErrorMessage('Voice recording is not supported in this browser format. Please use touch options.');
+      setErrorMessage(localized.voiceNotSupported);
       return;
     }
     selectedMimeRef.current = supportedMime;
@@ -101,11 +104,11 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
       cleanupMediaResources();
       setRecorderState('error');
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMessage('Microphone access was denied. Please allow permission or use touch options.');
+        setErrorMessage(localized.micDenied);
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setErrorMessage('No microphone detected. Please connect a microphone or use touch options.');
+        setErrorMessage(localized.micUnavailable);
       } else {
-        setErrorMessage('Could not connect to microphone. Please check settings and try again.');
+        setErrorMessage(localized.micConnectError);
       }
       return;
     }
@@ -148,7 +151,7 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
 
         if (rawBlob.size === 0) {
           setRecorderState('error');
-          setErrorMessage('No speech was detected. Please tap and try again.');
+          setErrorMessage(localized.noSpeechDetected);
           return;
         }
 
@@ -165,7 +168,7 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
         } catch (convErr) {
           console.error('Audio conversion error:', convErr);
           setRecorderState('error');
-          setErrorMessage('Could not process audio format. Please tap and speak again.');
+          setErrorMessage(localized.voiceProcessingFailed);
         }
       };
 
@@ -175,9 +178,9 @@ export function useVoiceRecorder({ onRecordingComplete, isTranscribing }) {
       console.error('MediaRecorder initialization failed:', recErr);
       cleanupMediaResources();
       setRecorderState('error');
-      setErrorMessage('Failed to start recording. Please try again.');
+      setErrorMessage(localized.micConnectError);
     }
-  }, [cleanupMediaResources, onRecordingComplete]);
+  }, [cleanupMediaResources, onRecordingComplete, localized]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {

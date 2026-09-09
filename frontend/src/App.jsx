@@ -1,6 +1,7 @@
 import './App.css';
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ProtectedRoute from './component/auth/ProtectedRoute';
 import HospitalHomepage from './component/utils/HospitalHomepage';
 import Login from './component/auth/Login';
 import Signup from './component/auth/Signup';
@@ -36,16 +37,39 @@ function App() {
         <Route path="/receptionist-dashboard" element={<ReceptionistDashboard />} />
         <Route path="/pharmacist-dashboard" element={<PharmacyDashboard />} />
         <Route path="/lab_staff-dashboard" element={<LabDashboard />} />
-        <Route path="/document-digitization" element={<DocumentDigitizationPage />} />
-        <Route path="/kiosk" element={<KioskHome/>}/>
+        <Route path="/document-digitization" element={<ProtectedRoute><DocumentDigitizationPage /></ProtectedRoute>} />
+        <Route
+          path="/kiosk"
+          element={
+            <ProtectedRoute>
+              <KioskHome />
+            </ProtectedRoute>
+          }
+        />
         {/* D3: Consent gate — must be passed before any A/B/C clinical session */}
-        <Route path="/kiosk/consent" element={<KioskConsentPage/>}/>
-        <Route path="/kiosk/interview" element={<KioskInterview/>}/>
-        <Route path="/triage" element={<TriageAlertScreen/>}/>
+        <Route
+          path="/kiosk/consent"
+          element={
+            <ProtectedRoute>
+              <KioskConsentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/kiosk/interview"
+          element={
+            <ProtectedRoute>
+              <KioskInterview />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/triage" element={<TriageAlertScreen />} />
         <Route path="/summary-review" element={
+          <ProtectedRoute>
           <Suspense fallback={<div>Loading...</div>}>
-            <SummaryReviewPage /> 
+            <SummaryReviewPage />
           </Suspense>
+          </ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>

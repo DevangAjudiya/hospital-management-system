@@ -1,17 +1,19 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { startInterview as apiStartInterview, submitInterviewAnswer as apiSubmitInterviewAnswer, transcribeAudio as apiTranscribeAudio } from '../services/interviewApi';
 import { convertBlobToWav } from '../utils/audioConverter';
-import { triggerStaffAlert, buildAlertPayload, getKioskSessionToken } from '../services/alertTriggerApi';
+import { triggerStaffAlert, buildAlertPayload } from '../services/alertTriggerApi';
+import { playTextToSpeech, stopSpeech } from '../services/languageService';
 
-export function useInterview() {
+export function useInterview(initialLanguage = 'en') {
   const [sessionId, setSessionId] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState(initialLanguage || 'en');
   const [assessmentType, setAssessmentType] = useState('modern');
   const [ayushAssessments, setAyushAssessments] = useState([]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [error, setError] = useState(null);
   
   const [interviewComplete, setInterviewComplete] = useState(false);
@@ -25,11 +27,13 @@ export function useInterview() {
   // Refs mirror the corresponding state values so async callbacks always
   // read the current value without stale-closure risk.
   const sessionIdRef = useRef(null);
-  const selectedLanguageRef = useRef('en');
+  const selectedLanguageRef = useRef(initialLanguage || 'en');
   const assessmentTypeRef = useRef('modern');
   const ayushAssessmentsRef = useRef([]);
   const isLoadingRef = useRef(false);
   const isTranscribingRef = useRef(false);
+  const isAiSpeakingRef = useRef(false);
+  const lastInputModeRef = useRef('touch');
 
   // Task 5: Frontend dedup for alert trigger (optimization — backend Redis is authoritative)
   const emittedAlertsRef = useRef(new Set());
@@ -41,12 +45,31 @@ export function useInterview() {
   const syncSetAyushAssessments = (v) => { ayushAssessmentsRef.current = v; setAyushAssessments(v); };
   const syncSetIsLoading = (v) => { isLoadingRef.current = v; setIsLoading(v); };
   const syncSetIsTranscribing = (v) => { isTranscribingRef.current = v; setIsTranscribing(v); };
+  const syncSetIsAiSpeaking = (v) => { isAiSpeakingRef.current = v; setIsAiSpeaking(v); };
+
+  // Synchronize language when initialLanguage prop changes
+  useEffect(() => {
+    if (initialLanguage) {
+      selectedLanguageRef.current = initialLanguage;
+      setSelectedLanguage(initialLanguage);
+    }
+  }, [initialLanguage]);
+
+  // Stop audio on unmount
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+    };
+  }, []);
 
   const resetInterview = useCallback(() => {
+    stopSpeech();
     syncSetSessionId(null);
     setCurrentQuestion(null);
     syncSetIsLoading(false);
     syncSetIsTranscribing(false);
+    syncSetIsAiSpeaking(false);
+    lastInputModeRef.current = 'touch';
     setError(null);
     setLastAction(null);
     setInterviewComplete(false);
@@ -73,7 +96,29 @@ export function useInterview() {
     if (data.next_question) {
       setCurrentQuestion(data.next_question);
       console.log('[VOICE] currentQuestion updated to:', JSON.stringify(data.next_question));
+
+      // Conversational Voice Mode: if patient answered via VOICE, auto-speak next question
+      if (lastInputModeRef.current === 'voice' && data.next_question.question) {
+        const questionToSpeak = data.next_question.question;
+        const targetLang = selectedLanguageRef.current || 'en';
+        console.log('[VOICE-CONVERSATIONAL] Auto-speaking question via TTS:', questionToSpeak, 'lang:', targetLang);
+        
+        syncSetIsAiSpeaking(true);
+        playTextToSpeech(questionToSpeak, targetLang, {
+          onStart: () => syncSetIsAiSpeaking(true),
+          onEnd: () => syncSetIsAiSpeaking(false),
+          onError: (err) => {
+            console.warn('[VOICE-CONVERSATIONAL] TTS error (non-fatal):', err);
+            syncSetIsAiSpeaking(false);
+          }
+        }).catch((err) => {
+          console.warn('[VOICE-CONVERSATIONAL] TTS playback rejected:', err);
+          syncSetIsAiSpeaking(false);
+        });
+      }
     } else if (data.interview_complete) {
+      stopSpeech();
+      syncSetIsAiSpeaking(false);
       setCurrentQuestion(null);
       console.log('[VOICE] Interview marked complete, currentQuestion cleared');
     }
@@ -84,7 +129,7 @@ export function useInterview() {
     setAlertTriggered(!!data.alert_triggered);
     setClinicalSummary(data.clinical_summary || null);
 
-    // ── Task 5: Trigger staff alert when Module A detects a red flag ──
+    // ── Trigger staff alert when Module A detects a red flag ──
     if (data.red_flag_detected === true && data.alert_triggered === true) {
       const alertSessionId = data.session_id || sessionIdRef.current || 'unknown';
       const rawSeverity = (data.red_flag_severity || '').toLowerCase();
@@ -107,35 +152,47 @@ export function useInterview() {
     }
   }, []);
 
-  const startInterview = useCallback(async (lang = 'en', type = 'modern') => {
+  const startInterview = useCallback(async (lang, type, initialComplaint = '', inputMode = 'touch') => {
+    const targetLang = lang || selectedLanguageRef.current || 'en';
+    const targetType = type || assessmentTypeRef.current || 'modern';
+
+    stopSpeech();
+    syncSetIsAiSpeaking(false);
+    lastInputModeRef.current = inputMode;
+
     syncSetIsLoading(true);
     setError(null);
-    syncSetSelectedLanguage(lang);
-    syncSetAssessmentType(type);
-    setLastAction(() => () => startInterview(lang, type));
+    syncSetSelectedLanguage(targetLang);
+    syncSetAssessmentType(targetType);
+    setLastAction(() => () => startInterview(targetLang, targetType, initialComplaint, inputMode));
     
     try {
-      const data = await apiStartInterview(lang, type);
+      const data = await apiStartInterview(targetLang, targetType, initialComplaint, inputMode);
       handleApiResponse(data);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to start interview. Please check your network connection.');
+      setError(err.message || 'Failed to start consultation. Please check your network connection.');
     } finally {
       syncSetIsLoading(false);
     }
   }, [handleApiResponse]);
 
   // submitAnswer uses refs for guards so it never silently returns due to stale closure
-  const submitAnswer = useCallback(async (answer, inputMode = 'touch') => {
+  const submitAnswer = useCallback(async (answer, inputMode = 'touch', overrideLang = null) => {
     const currentSessionId = sessionIdRef.current;
     const currentIsLoading = isLoadingRef.current;
+    const currentLang = overrideLang || selectedLanguageRef.current || 'en';
+
+    stopSpeech();
+    syncSetIsAiSpeaking(false);
+    lastInputModeRef.current = inputMode;
 
     console.log('[VOICE] submitAnswer called:', {
       answer,
       inputMode,
       sessionId: currentSessionId,
       isLoading: currentIsLoading,
-      language: selectedLanguageRef.current,
+      language: currentLang,
       assessmentType: assessmentTypeRef.current,
     });
 
@@ -150,11 +207,11 @@ export function useInterview() {
 
     syncSetIsLoading(true);
     setError(null);
-    setLastAction(() => () => submitAnswer(answer, inputMode));
+    setLastAction(() => () => submitAnswer(answer, inputMode, currentLang));
     
     const payload = {
       sessionId: currentSessionId,
-      language: selectedLanguageRef.current,
+      language: currentLang,
       assessmentType: assessmentTypeRef.current,
       answer,
       inputMode: inputMode || 'touch',
@@ -165,7 +222,7 @@ export function useInterview() {
     try {
       const data = await apiSubmitInterviewAnswer(
         currentSessionId,
-        selectedLanguageRef.current,
+        currentLang,
         assessmentTypeRef.current,
         answer,
         inputMode || 'touch',
@@ -191,10 +248,15 @@ export function useInterview() {
     }
   }, [lastAction, startInterview]);
 
-  const submitVoiceAnswer = useCallback(async (audioBlob) => {
+  const submitVoiceAnswer = useCallback(async (audioBlob, overrideLang = null) => {
     const currentSessionId = sessionIdRef.current;
     const currentIsLoading = isLoadingRef.current;
     const currentIsTranscribing = isTranscribingRef.current;
+    const activeLang = overrideLang || selectedLanguageRef.current || 'en';
+
+    stopSpeech();
+    syncSetIsAiSpeaking(false);
+    lastInputModeRef.current = 'voice';
 
     console.log('[VOICE] submitVoiceAnswer called:', {
       blobSize: audioBlob?.size,
@@ -202,12 +264,9 @@ export function useInterview() {
       sessionId: currentSessionId,
       isLoading: currentIsLoading,
       isTranscribing: currentIsTranscribing,
+      language: activeLang
     });
 
-    if (!currentSessionId) {
-      console.error('[VOICE] submitVoiceAnswer BLOCKED — sessionId is null');
-      return;
-    }
     if (currentIsLoading) {
       console.error('[VOICE] submitVoiceAnswer BLOCKED — isLoading is true');
       return;
@@ -222,7 +281,6 @@ export function useInterview() {
     
     let transcript = '';
     try {
-      // useVoiceRecorder already converts to WAV; skip redundant conversion
       let wavBlob = audioBlob;
       if (!audioBlob.type || !audioBlob.type.includes('wav')) {
         console.log('[VOICE] Blob is not WAV, converting:', audioBlob.type);
@@ -232,10 +290,9 @@ export function useInterview() {
         console.log('[VOICE] Blob is already WAV, skipping conversion:', audioBlob.type, 'size:', audioBlob.size);
       }
 
-      const lang = selectedLanguageRef.current;
-      console.log('[VOICE] Sending audio to /transcribe, language:', lang, 'WAV size:', wavBlob.size);
+      console.log('[VOICE] Sending audio to /transcribe, language:', activeLang, 'WAV size:', wavBlob.size);
 
-      const transcribeData = await apiTranscribeAudio(wavBlob, lang, 'wav');
+      const transcribeData = await apiTranscribeAudio(wavBlob, activeLang, 'wav');
       console.log('[VOICE] /transcribe response:', JSON.stringify(transcribeData));
       console.log('[VOICE] transcribeData.success:', transcribeData.success);
       console.log('[VOICE] transcribeData.transcript:', transcribeData.transcript);
@@ -259,15 +316,36 @@ export function useInterview() {
     }
     
     syncSetIsTranscribing(false);
-    console.log('[VOICE] isTranscribing set to false, calling submitAnswer...');
-    console.log('[VOICE] Calling submitAnswer() with transcript:', transcript, 'inputMode: voice');
+    console.log('[VOICE] isTranscribing set to false, proceeding to submit...');
+    console.log('[VOICE] Transcript:', transcript, 'inputMode: voice', 'language:', activeLang);
     console.log('[VOICE] sessionId at this point:', sessionIdRef.current);
-    console.log('[VOICE] patientMessage (transcript):', transcript);
 
-    // Seamlessly forward the resulting transcript into the existing Task 2 answer submission flow
-    await submitAnswer(transcript, 'voice');
-    console.log('[VOICE] submitAnswer() completed');
-  }, [submitAnswer]);
+    if (!sessionIdRef.current) {
+      console.log('[VOICE] Submitting initial voice complaint to startInterview with language:', activeLang);
+      await startInterview(activeLang, assessmentTypeRef.current, transcript, 'voice');
+    } else {
+      console.log('[VOICE] Calling submitAnswer() with transcript:', transcript, 'inputMode: voice', 'language:', activeLang);
+      await submitAnswer(transcript, 'voice', activeLang);
+    }
+    console.log('[VOICE] submitVoiceAnswer() completed');
+  }, [startInterview, submitAnswer]);
+
+  const speakQuestion = useCallback((text, lang) => {
+    const targetText = text || currentQuestion?.question;
+    if (!targetText) return;
+    const targetLang = lang || selectedLanguageRef.current || 'en';
+    syncSetIsAiSpeaking(true);
+    playTextToSpeech(targetText, targetLang, {
+      onStart: () => syncSetIsAiSpeaking(true),
+      onEnd: () => syncSetIsAiSpeaking(false),
+      onError: () => syncSetIsAiSpeaking(false)
+    }).catch(() => syncSetIsAiSpeaking(false));
+  }, [currentQuestion]);
+
+  const stopSpeaking = useCallback(() => {
+    stopSpeech();
+    syncSetIsAiSpeaking(false);
+  }, []);
 
   return {
     sessionId,
@@ -277,6 +355,7 @@ export function useInterview() {
     ayushAssessments,
     isLoading,
     isTranscribing,
+    isAiSpeaking,
     error,
     interviewComplete,
     redFlagDetected,
@@ -286,6 +365,8 @@ export function useInterview() {
     startInterview,
     submitAnswer,
     submitVoiceAnswer,
+    speakQuestion,
+    stopSpeaking,
     resetInterview,
     retryLastAction,
     setAyushAssessments: syncSetAyushAssessments,

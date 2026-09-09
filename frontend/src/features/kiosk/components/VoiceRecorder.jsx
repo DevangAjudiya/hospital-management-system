@@ -6,12 +6,16 @@ import {
   FaRedo,
   FaExclamationCircle
 } from 'react-icons/fa';
+import { FaVolumeHigh } from 'react-icons/fa6';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
+import { getKioskStrings } from '../utils/kioskLocalization';
 
 export default function VoiceRecorder({
   onVoiceSubmit,
   isTranscribing = false,
-  disabled = false
+  isAiSpeaking = false,
+  disabled = false,
+  language = 'en'
 }) {
   const {
     recorderState,
@@ -22,9 +26,11 @@ export default function VoiceRecorder({
     resetRecorder
   } = useVoiceRecorder({
     onRecordingComplete: onVoiceSubmit,
-    isTranscribing
+    isTranscribing,
+    language
   });
 
+  const strings = getKioskStrings(language);
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
 
@@ -112,7 +118,7 @@ export default function VoiceRecorder({
   }, [recorderState, analyser]);
 
   const handleMainAction = () => {
-    if (disabled) return;
+    if (disabled || isAiSpeaking) return;
 
     if (recorderState === 'idle') {
       startRecording();
@@ -124,24 +130,26 @@ export default function VoiceRecorder({
     }
   };
 
-  const isInteractionDisabled = disabled || recorderState === 'requesting' || recorderState === 'processing';
+  const isInteractionDisabled = disabled || isAiSpeaking || recorderState === 'requesting' || recorderState === 'processing';
 
   return (
     <div className="w-full bg-gradient-to-r from-teal-50/60 via-mint/40 to-slate-50 border-2 border-teal-100 rounded-2xl p-4 sm:p-5 shadow-xs transition-all">
       {/* Top Header / Context Label */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
+          <span className={`w-2.5 h-2.5 rounded-full ${isAiSpeaking ? 'bg-teal-500 animate-ping' : 'bg-teal-500 animate-pulse'}`} />
           <span className="text-xs font-bold uppercase tracking-wider text-teal-800">
-            Voice Answer Option
+            {isAiSpeaking ? strings.aiSpeaking : strings.voiceAnswerOption}
           </span>
         </div>
         <span className="text-xs text-slate-500 font-medium">
-          {recorderState === 'recording'
-            ? 'Speaking... tap stop when done'
+          {isAiSpeaking
+            ? strings.aiSpeakingHint
+            : recorderState === 'recording'
+            ? strings.speakingHint
             : recorderState === 'processing'
-            ? 'Sending to clinical engine'
-            : 'Touch or Voice'}
+            ? strings.sendingToEngine
+            : strings.touchOrVoice}
         </span>
       </div>
 
@@ -153,16 +161,20 @@ export default function VoiceRecorder({
           onClick={handleMainAction}
           disabled={isInteractionDisabled}
           aria-label={
-            recorderState === 'recording'
+            isAiSpeaking
+              ? strings.aiSpeaking
+              : recorderState === 'recording'
               ? 'Stop Recording'
               : recorderState === 'processing'
               ? 'Processing Voice'
               : recorderState === 'error'
-              ? 'Try Recording Again'
-              : 'Tap to Speak'
+              ? strings.tryAgain
+              : strings.tapToSpeak
           }
           className={`relative group flex items-center justify-center gap-3 sm:gap-4 px-6 py-4 sm:py-4.5 rounded-2xl font-bold text-base sm:text-lg transition-all duration-200 cursor-pointer select-none min-h-[72px] sm:min-h-[76px] ${
-            recorderState === 'recording'
+            isAiSpeaking
+              ? 'bg-teal-700/90 text-white shadow-md cursor-wait'
+              : recorderState === 'recording'
               ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-300/50 ring-4 ring-rose-200 active:scale-[0.98]'
               : recorderState === 'processing'
               ? 'bg-teal-700 text-white shadow-md opacity-90 cursor-wait'
@@ -171,19 +183,23 @@ export default function VoiceRecorder({
               : recorderState === 'error'
               ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md active:scale-[0.98]'
               : 'bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-300/40 hover:scale-[1.01] active:scale-[0.98]'
-          } ${disabled ? 'opacity-50 cursor-not-allowed transform-none' : ''}`}
+          } ${disabled && !isAiSpeaking ? 'opacity-50 cursor-not-allowed transform-none' : ''}`}
         >
           {/* State Icon */}
           <div
             className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg transition-transform ${
-              recorderState === 'recording'
+              isAiSpeaking
+                ? 'bg-white/20 text-white animate-bounce'
+                : recorderState === 'recording'
                 ? 'bg-white/20 text-white animate-pulse'
                 : recorderState === 'processing' || recorderState === 'requesting'
                 ? 'bg-white/20 text-white'
                 : 'bg-white/20 text-white group-hover:scale-110'
             }`}
           >
-            {recorderState === 'recording' ? (
+            {isAiSpeaking ? (
+              <FaVolumeHigh className="text-lg" />
+            ) : recorderState === 'recording' ? (
               <FaStop className="text-base" />
             ) : recorderState === 'processing' || recorderState === 'requesting' ? (
               <FaSpinner className="animate-spin text-lg" />
@@ -197,18 +213,20 @@ export default function VoiceRecorder({
           {/* State Labels */}
           <div className="text-left flex flex-col justify-center">
             <span className="leading-tight font-extrabold text-base sm:text-lg">
-              {recorderState === 'idle' && 'Tap to Speak'}
-              {recorderState === 'requesting' && 'Allow microphone...'}
-              {recorderState === 'recording' && 'Listening...'}
-              {recorderState === 'processing' && 'Processing...'}
-              {recorderState === 'error' && 'Try Again'}
+              {isAiSpeaking && strings.aiSpeaking}
+              {!isAiSpeaking && recorderState === 'idle' && strings.tapToSpeak}
+              {!isAiSpeaking && recorderState === 'requesting' && strings.allowMic}
+              {!isAiSpeaking && recorderState === 'recording' && strings.listening}
+              {!isAiSpeaking && recorderState === 'processing' && strings.processing}
+              {!isAiSpeaking && recorderState === 'error' && strings.tryAgain}
             </span>
             <span className="text-xs font-normal opacity-90 leading-tight mt-0.5">
-              {recorderState === 'idle' && 'Speak your answer in your preferred language'}
-              {recorderState === 'requesting' && 'Confirm the browser permission prompt'}
-              {recorderState === 'recording' && 'Tap to complete response'}
-              {recorderState === 'processing' && 'Transcribing clinical response'}
-              {recorderState === 'error' && 'Tap to restart voice recording'}
+              {isAiSpeaking && strings.aiSpeakingHint}
+              {!isAiSpeaking && recorderState === 'idle' && strings.tapToSpeakSub}
+              {!isAiSpeaking && recorderState === 'requesting' && strings.allowMicSub}
+              {!isAiSpeaking && recorderState === 'recording' && strings.listeningSub}
+              {!isAiSpeaking && recorderState === 'processing' && strings.processingSub}
+              {!isAiSpeaking && recorderState === 'error' && strings.tryAgainSub}
             </span>
           </div>
         </button>
@@ -219,7 +237,7 @@ export default function VoiceRecorder({
             <div className="flex items-center gap-2 mb-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
               <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
-                Live Audio Waveform
+                {strings.liveWaveform}
               </span>
             </div>
             <canvas
@@ -235,9 +253,9 @@ export default function VoiceRecorder({
         {recorderState === 'idle' && (
           <div className="hidden sm:flex flex-1 flex-col justify-center px-4 py-2 text-slate-500 text-xs leading-relaxed border-l border-teal-100/80">
             <div className="font-semibold text-slate-700 mb-0.5">
-              Hands-free consultation available
+              {strings.handsFreeTitle}
             </div>
-            You may speak naturally in full sentences or short phrases. Tap the microphone to begin.
+            {strings.handsFreeDesc}
           </div>
         )}
 
@@ -246,7 +264,7 @@ export default function VoiceRecorder({
           <div className="flex-1 flex items-center justify-center gap-3 bg-white/80 border border-teal-100 rounded-2xl p-4">
             <FaSpinner className="animate-spin text-teal-600 text-xl" />
             <div className="text-xs text-slate-600 font-semibold">
-              Transcribing audio via speech recognition engine...
+              {strings.processingBanner}
             </div>
           </div>
         )}
@@ -257,7 +275,7 @@ export default function VoiceRecorder({
         <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-xs sm:text-sm flex items-start gap-2.5 shadow-2xs">
           <FaExclamationCircle className="text-amber-600 text-base flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <strong className="font-bold block text-amber-950">Audio Notice</strong>
+            <strong className="font-bold block text-amber-950">{strings.audioNotice}</strong>
             <span>{errorMessage}</span>
           </div>
           <button
@@ -269,7 +287,7 @@ export default function VoiceRecorder({
             className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
           >
             <FaRedo className="text-[10px]" />
-            <span>Retry</span>
+            <span>{strings.retry}</span>
           </button>
         </div>
       )}

@@ -109,13 +109,6 @@ export default function PatientNavbar({
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-3">
 
-            <button
-              onClick={() => navigate("/patient-dashboard")}
-              className="px-4 py-2 text-slate-700 hover:text-teal-700 font-bold transition-colors"
-            >
-              Patient Portal
-            </button>
-
             {/* Start Consultation */}
             <button
               onClick={handleStartConsultation}
