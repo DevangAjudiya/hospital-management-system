@@ -27,12 +27,15 @@ class TranslateRequest(BaseModel):
 
 @app.post("/translate")
 def translate_text(req: TranslateRequest):
-    try:
-        text = req.text
-        if not text:
-            return {"translatedText": ""}
+    text = req.text
+    if not text:
+        return {"translatedText": ""}
 
+    # Try IndicTrans2 model first
+    try:
         batch = ip.preprocess_batch([text], src_lang=req.src_lang, tgt_lang=req.tgt_lang)
+        if batch is None or len(batch) == 0:
+            raise ValueError("preprocess_batch returned None or empty")
         inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
 
         with torch.no_grad():
@@ -41,9 +44,29 @@ def translate_text(req: TranslateRequest):
         decoded = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
         translations = ip.postprocess_batch(decoded, lang=req.tgt_lang)
 
-        return {"translatedText": translations[0]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        if translations and translations[0]:
+            return {"translatedText": translations[0]}
+        raise ValueError("postprocess_batch returned empty result")
+    except Exception as model_err:
+        print(f"[IndicTrans2] model failed: {model_err}, falling back to GoogleTranslator")
+
+    # Fallback: deep_translator GoogleTranslator
+    if TRANSLATOR_AVAILABLE:
+        try:
+            # Map IndicTrans lang codes to Google lang codes
+            lang_map = {
+                "hin_Deva": "hi", "ben_Beng": "bn", "tam_Taml": "ta",
+                "tel_Telu": "te", "mar_Deva": "mr", "guj_Gujr": "gu",
+                "kan_Knda": "kn", "mal_Mlym": "ml", "pan_Guru": "pa",
+                "urd_Arab": "ur", "eng_Latn": "en"
+            }
+            tgt = lang_map.get(req.tgt_lang, req.tgt_lang[:2])
+            translated = GoogleTranslator(source="auto", target=tgt).translate(text)
+            return {"translatedText": translated}
+        except Exception as fallback_err:
+            raise HTTPException(status_code=500, detail=f"Both translation methods failed: {fallback_err}")
+
+    raise HTTPException(status_code=500, detail="Translation model failed and no fallback available") 
 
 from gtts import gTTS
 from fastapi.responses import StreamingResponse

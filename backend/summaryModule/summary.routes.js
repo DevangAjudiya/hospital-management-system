@@ -266,8 +266,10 @@ router.get('/:id/translate', async (req, res) => {
     if (!doc) return res.status(404).json({ error: 'Summary not found.' });
 
     // Already translated earlier — return cached value, skip re-translating
-    if (doc.languageOutputs?.hi) {
-      return res.json({ success: true, hi: doc.languageOutputs.hi });
+    // But re-translate if the cached value is a previous error string
+    const cachedHi = doc.languageOutputs?.hi;
+    if (cachedHi && !cachedHi.startsWith('[Translation Error')) {
+      return res.json({ success: true, hi: cachedHi });
     }
 
     const { translateTextViaIndicTrans2 } = require('./summary.service');

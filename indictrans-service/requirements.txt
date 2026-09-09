@@ -5,3 +5,7 @@ transformers
 sacremoses
 pandas
 indictranstoolkit
+sentencepiece
+mosestokenizer
+gtts
+deep-translator
