@@ -93,6 +93,30 @@ function runEncryptionTests() {
         passed++;
     } catch(e) { console.error("❌ Test 8/9 failed", e); failed++; }
 
+    // Test 11: hash() is deterministic, handles case/whitespace, requires key
+    try {
+        const plaintext1 = "Patient@ABDM";
+        const plaintext2 = " patient@abdm ";
+        const plaintext3 = "other@abdm";
+
+        const hash1 = encryptionService.hash(plaintext1);
+        const hash2 = encryptionService.hash(plaintext2);
+        const hash3 = encryptionService.hash(plaintext3);
+
+        assert.ok(typeof hash1 === 'string' && hash1.length > 0);
+        assert.strictEqual(hash1, hash2, "Whitespace and case should be normalized");
+        assert.notStrictEqual(hash1, hash3, "Different plaintext should yield different hash");
+
+        // Missing key fails safely
+        const backupKey = encryptionService.key;
+        encryptionService.key = null;
+        assert.throws(() => encryptionService.hash("test"), /Missing or invalid MASTER_ENCRYPTION_KEY/);
+        encryptionService.key = backupKey;
+
+        console.log("✅ Test 11: hash() is deterministic, normalizes inputs, and requires key safely");
+        passed++;
+    } catch(e) { console.error("❌ Test 11 failed", e); failed++; }
+
     console.log(`\nEncryption Test Summary: ${passed} passed, ${failed} failed.`);
     if (failed > 0) process.exit(1);
 }

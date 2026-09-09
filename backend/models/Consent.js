@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const consentSchema = new mongoose.Schema({
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+  abdmConsentId: { type: String, default: null },
   purpose: { type: String, required: true },
   requestedDataTypes: [{ 
     type: String, 

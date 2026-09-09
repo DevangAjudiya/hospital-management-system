@@ -88,6 +88,26 @@ class EncryptionService {
             throw new Error("Decryption failed: Authentication tag verification failed or corrupted data");
         }
     }
+
+    /**
+     * Generates a deterministic HMAC-SHA256 hash of a plaintext string.
+     * Used for secure, exact-match database lookups without exposing plaintext.
+     * @param {string} plaintext 
+     * @returns {string} Hex-encoded HMAC
+     */
+    hash(plaintext) {
+        if (!plaintext) return plaintext;
+        if (!this.key) {
+             throw new Error("Hashing failed: Missing or invalid MASTER_ENCRYPTION_KEY");
+        }
+
+        // Normalize: trim whitespace and lowercase to ensure consistent hashing
+        const normalized = plaintext.trim().toLowerCase();
+
+        const hmac = crypto.createHmac('sha256', this.key);
+        hmac.update(normalized, 'utf8');
+        return hmac.digest('hex');
+    }
 }
 
 module.exports = new EncryptionService();

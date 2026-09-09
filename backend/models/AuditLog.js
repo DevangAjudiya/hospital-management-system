@@ -4,7 +4,7 @@ const auditLogSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: "Patient" },
   action: { type: String, required: true },
-  category: { type: String, enum: ["CONSENT", "SECURITY", "SYSTEM", "ACCESS"], default: "SYSTEM" },
+  category: { type: String, enum: ["CONSENT", "SECURITY", "SYSTEM", "ACCESS", "ABDM", "IDENTITY"], default: "SYSTEM" },
   details: { type: String },
   resourceType: { type: String },
   resourceId: { type: String },

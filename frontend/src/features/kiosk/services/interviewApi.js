@@ -1,7 +1,34 @@
-const BASE_URL = import.meta.env.VITE_INTERVIEW_API_BASE_URL || 'https://vps-nisarg-10gb-bjyqw.aiccloud.online';
+/**
+ * D3 Interview API Service — routes through Node proxy (consent-gated)
+ *
+ * BEFORE D3: Browser → External AI (vps-nisarg.../interview)
+ * AFTER  D3: Browser → Node /api/kiosk/interview → consentMiddleware → External AI
+ *
+ * All calls now go through the MediKiosk backend which enforces:
+ *  - JWT authentication
+ *  - Server-side patient resolution
+ *  - Active GRANTED consent check
+ *  - Only then forwards to the Nisarg AI service
+ *
+ * Transport preserved:
+ *  - /interview  : JSON POST (identical payload)
+ *  - /transcribe : multipart/form-data WAV (identical payload)
+ *
+ * The proxy BASE_URL is the local MediKiosk Node backend.
+ */
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+/** Retrieve the patient JWT from localStorage */
+function getAuthHeader() {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Not authenticated. Please log in from the Patient Dashboard.');
+  return { 'Authorization': `Bearer ${token}` };
+}
 
 /**
  * Starts a new interview session.
+ * Routed through: POST /api/kiosk/interview (consent-gated Node proxy)
  */
 export async function startInterview(language = 'en', assessmentType = 'modern', initialComplaint = '', inputMode = 'touch') {
   const payload = {
@@ -13,10 +40,11 @@ export async function startInterview(language = 'en', assessmentType = 'modern',
     patient_message: initialComplaint || ""
   };
 
-  const response = await fetch(`${BASE_URL}/interview`, {
+  const response = await fetch(`${BACKEND_URL}/api/kiosk/interview`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...getAuthHeader()
     },
     body: JSON.stringify(payload)
   });
@@ -25,12 +53,8 @@ export async function startInterview(language = 'en', assessmentType = 'modern',
     let errMsg = response.statusText;
     try {
       const errData = await response.json();
-      if (errData && (errData.message || errData.error || errData.detail)) {
-        errMsg = errData.message || errData.error || errData.detail;
-      }
-    } catch {
-      // ignore json parse error
-    }
+      errMsg = errData.message || errData.error || errData.detail || errMsg;
+    } catch { /* ignore */ }
     throw new Error(`Failed to start consultation: ${errMsg}`);
   }
 
@@ -39,6 +63,7 @@ export async function startInterview(language = 'en', assessmentType = 'modern',
 
 /**
  * Submits an answer to the interview API.
+ * Routed through: POST /api/kiosk/interview (consent-gated Node proxy)
  */
 export async function submitInterviewAnswer(
   sessionId,
@@ -69,10 +94,11 @@ export async function submitInterviewAnswer(
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const response = await fetch(`${BASE_URL}/interview`, {
+    const response = await fetch(`${BACKEND_URL}/api/kiosk/interview`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
       },
       body: JSON.stringify(payload),
       signal: controller.signal
@@ -86,12 +112,8 @@ export async function submitInterviewAnswer(
       let errMsg = response.statusText;
       try {
         const errData = await response.json();
-        if (errData && (errData.message || errData.error || errData.detail)) {
-          errMsg = errData.message || errData.error || errData.detail;
-        }
-      } catch {
-        // ignore json parse error
-      }
+        errMsg = errData.message || errData.error || errData.detail || errMsg;
+      } catch { /* ignore */ }
       throw new Error(`Failed to submit response: ${errMsg}`);
     }
 
@@ -113,13 +135,15 @@ export async function submitInterviewAnswer(
 
 /**
  * Transcribes audio.
+ * Routed through: POST /api/kiosk/transcribe (consent-gated Node proxy)
+ * Transport: multipart/form-data WAV — identical to original
  */
 export async function transcribeAudio(audioBlob, language, extension = 'wav') {
   const formData = new FormData();
   const filename = `recording.${extension || 'wav'}`;
   formData.append('audio', audioBlob, filename);
 
-  const url = new URL(`${BASE_URL}/transcribe`);
+  const url = new URL(`${BACKEND_URL}/api/kiosk/transcribe`);
   if (language) {
     url.searchParams.append('language', language);
   }
@@ -133,6 +157,7 @@ export async function transcribeAudio(audioBlob, language, extension = 'wav') {
   try {
     const response = await fetch(url.toString(), {
       method: 'POST',
+      headers: getAuthHeader(),   // multipart boundary set automatically by FormData; no Content-Type override
       body: formData,
       signal: controller.signal
     });
@@ -144,16 +169,14 @@ export async function transcribeAudio(audioBlob, language, extension = 'wav') {
       let errMsg = response.statusText;
       try {
         const errData = await response.json();
-        if (errData && (errData.detail || errData.message || errData.error)) {
+        if (errData) {
           if (Array.isArray(errData.detail)) {
             errMsg = errData.detail.map((d) => d.msg || JSON.stringify(d)).join(', ');
           } else {
-            errMsg = errData.detail || errData.message || errData.error;
+            errMsg = errData.detail || errData.message || errData.error || errMsg;
           }
         }
-      } catch {
-        // ignore JSON parse errors
-      }
+      } catch { /* ignore */ }
       throw new Error(`Failed to transcribe audio: ${errMsg}`);
     }
 
@@ -173,10 +196,11 @@ export async function transcribeAudio(audioBlob, language, extension = 'wav') {
 }
 
 /**
- * Health check.
+ * Health check — still calls the external AI directly (no clinical data, no consent needed)
  */
 export async function checkHealth() {
-  const response = await fetch(`${BASE_URL}/health`);
+  const NISARG_URL = import.meta.env.VITE_INTERVIEW_API_BASE_URL || 'https://vps-nisarg-10gb-bjyqw.aiccloud.online';
+  const response = await fetch(`${NISARG_URL}/health`);
   if (!response.ok) {
     throw new Error('API is not healthy');
   }

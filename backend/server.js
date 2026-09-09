@@ -71,6 +71,10 @@ const billRouter = require("./router/bill.js");
 const consentRouter = require("./router/consent.js");
 const alertRouter = require("./alertModule/alert.routes.js");
 const kioskAuthRouter = require("./alertModule/kioskAuth.js");
+// D3: Consent-gated proxy routers for Module A (Nisarg AI) and Module B (Devang AI)
+const kioskProxyRouter = require("./router/kioskProxy.js");
+const documentProxyRouter = require("./router/documentProxy.js");
+// const abdmRouter = require("./router/abdm.js"); // Removed, imported below
 
 // API Mounts
 app.use("/api/auth", authRouter);
@@ -84,6 +88,15 @@ app.use("/api/billing", billRouter);
 app.use("/api/consent", consentRouter);
 app.use("/api/triage/alerts", alertRouter);
 app.use("/api/kiosk", kioskAuthRouter);
+// D3: Module A proxy — consent-gated interview + transcription forwarding
+app.use("/api/kiosk", kioskProxyRouter);
+// D3: Module B proxy — consent-gated document OCR forwarding
+app.use("/api/document", documentProxyRouter);
+
+// ABDM Callbacks
+const { abdmRouter, notifyRouter } = require("./router/abdm.js");
+app.use("/v1", abdmRouter);
+app.use("/v0.5", notifyRouter);
 
 
 app.get("/", (req, res) => {

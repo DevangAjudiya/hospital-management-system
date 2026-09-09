@@ -62,9 +62,10 @@ function KioskHome() {
   const patientId = location.state?.patientId || localStorage.getItem("hmsPatientId") || user.patientId || null;
 
   const startConsultation = () => {
+    // D3: Navigate to consent page first — clinical session only begins after explicit consent
     stopSpeech();
     localStorage.setItem('kiosk_language', language);
-    navigate('/kiosk/interview', {
+    navigate('/kiosk/consent', {
       state: {
         patientId,
         language,

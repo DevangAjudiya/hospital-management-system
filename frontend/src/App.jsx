@@ -16,6 +16,7 @@ import LabDashboard from './component/lab/LabDashboard';
 import DocumentDigitizationPage from './features/document-digitization';
 import KioskHome from './features/kiosk/KioskHome';
 import KioskInterview from './features/kiosk/pages/KioskInterview';
+import KioskConsentPage from './features/kiosk/pages/KioskConsentPage';
 import TriageAlertScreen from './features/triage/TriageAlertScreen';
 const SummaryReviewPage = React.lazy(() =>
   import('./features/summary-generator/pages/SummaryReviewPage')
@@ -45,7 +46,15 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+        {/* D3: Consent gate — must be passed before any A/B/C clinical session */}
+        <Route
+          path="/kiosk/consent"
+          element={
+            <ProtectedRoute>
+              <KioskConsentPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/kiosk/interview"
           element={

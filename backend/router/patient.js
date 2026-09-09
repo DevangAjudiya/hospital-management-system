@@ -235,4 +235,36 @@ patientRouter.get("/prescriptions", async (req, res) => {
     }
 });
 
+patientRouter.post("/associate-abha", async (req, res) => {
+    try {
+        const { abhaAddress, patientId } = req.body;
+        if (!abhaAddress) return res.status(400).json({ message: "abhaAddress is required" });
+
+        const abhaService = require("../services/abdm/abhaAssociationService");
+        const mongoose = require("mongoose");
+
+        let targetPatientId;
+        if (req.user.role === "patient") {
+            targetPatientId = await getPatientId(req.user.id);
+        } else {
+            if (!patientId) return res.status(400).json({ message: "patientId is required for staff" });
+            if (!mongoose.Types.ObjectId.isValid(patientId)) return res.status(400).json({ message: "Malformed patientId" });
+            targetPatientId = patientId;
+        }
+
+        const ipAddress = req.ip || req.socket.remoteAddress;
+        await abhaService.storeAbhaAddress(targetPatientId, abhaAddress, req.user.id, ipAddress);
+
+        res.json({ message: "ABHA Address associated successfully" });
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({ message: "This ABHA Address is already associated with an existing patient profile" });
+        }
+        if (err.message === "Patient not found" || err.message === "Invalid ABHA Address") {
+            return res.status(400).json({ message: err.message });
+        }
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = patientRouter;

@@ -4,27 +4,37 @@ const mongoose = require('mongoose');
 const { generateSummary, updateSummaryTranslation } = require('./summary.service');
 const Summary = require('./summary.model');
 const { buildDocumentTimeline, buildInvestigations } = require('./adapters/documentAdapter');
+const { authenticate } = require('../middleware/authMiddleware');
+const { requireConsent } = require('../middleware/consentMiddleware');
 
-
+// D3: Protected summary generation — requires authenticated patient + active consent.
+// All three (A, B, C) funnel into this endpoint, so protecting it here gates all of them.
 // Universal integration endpoint: Accepts payloads from Module A (Nisarg) & Module B (Devang)
-router.post('/generate', async (req, res) => {
+router.post('/generate',
+  authenticate,
+  requireConsent({ purpose: 'kiosk-consultation', dataTypes: ['All'] }),
+  async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ error: 'Database connection not ready. Please try again.' });
     }
 
-    const { patientId, interviewData, documentTimeline, analyzedDocuments } = req.body; // <-- ADD analyzedDocuments here
+    const { interviewData, documentTimeline, analyzedDocuments } = req.body;
+    // D3: Use server-side resolved patientId — never trust browser-supplied body.patientId
+    // req.resolvedPatientId is set by requireConsent middleware after DB lookup from JWT
 
-    // <-- ADD THIS LINE (new, right after the destructure above, before calling generateSummary)
     const finalTimeline = documentTimeline || (analyzedDocuments ? buildDocumentTimeline(analyzedDocuments) : undefined);
     const finalInvestigations = analyzedDocuments ? buildInvestigations(analyzedDocuments) : [];
     // Call service layer with cross-module inputs (will safely fallback to mock data if empty)
-    const structuredSummary = await generateSummary(interviewData, finalTimeline); // <-- CHANGED: documentTimeline -> finalTimeline
+    const structuredSummary = await generateSummary(interviewData, finalTimeline);
 
     // Save linked summary record to MongoDB
     console.log("-> Generating summary and saving to DB...");
-    // ★★★ ADD THIS MISSING LINE — fetches the existing document BEFORE the merge logic below uses it
-    const targetPatientId = patientId || 'kiosk-patient-default';
+    // Use the middleware-resolved patientId (server-side, not browser-supplied)
+    const targetPatientId = req.resolvedPatientId ? req.resolvedPatientId.toString() : null;
+    if (!targetPatientId) {
+      return res.status(400).json({ success: false, error: 'Patient record could not be resolved.' });
+    }
     const existingDoc = await Summary.findOne({ patientId: targetPatientId });
 
     // ★★★ NEW BLOCK — merge new timeline entries onto existing ones instead of

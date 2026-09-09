@@ -53,27 +53,33 @@ export async function getSummaryById(id) {
 
 /**
  * Generates or fetches an integrated clinical summary.
+ * D3: Route now requires authentication + active consent.
+ *     patientId is resolved server-side from JWT — do NOT send it in body.
+ *
  * @param {Object} params
- * @param {string} [params.patientId]
  * @param {Object} [params.interviewData]
- * @param {Array} [params.documentTimeline]
- * @param {Array} [params.analyzedDocuments]
+ * @param {Array}  [params.documentTimeline]
+ * @param {Array}  [params.analyzedDocuments]
  * @returns {Promise<Object>} The summary document data
  */
 export async function generateSummary({
-  patientId = 'sample-patient-001',
   interviewData,
   documentTimeline,
   analyzedDocuments
 } = {}) {
-  const payload = { patientId };
+  const token = localStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  // D3: patientId is intentionally omitted — the backend resolves it from JWT
+  const payload = {};
   if (interviewData) payload.interviewData = interviewData;
   if (documentTimeline) payload.documentTimeline = documentTimeline;
   if (analyzedDocuments) payload.analyzedDocuments = analyzedDocuments;
 
   const res = await fetch(`${BASE_URL}/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload)
   });
 
@@ -84,6 +90,7 @@ export async function generateSummary({
 
   return json.data || json;
 }
+
 
 /**
  * Updates summary status and saves doctor amendments/edits.
