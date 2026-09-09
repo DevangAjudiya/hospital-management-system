@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaArrowRight, FaTimes } from 'react-icons/fa';
+import { getKioskStrings } from '../utils/kioskLocalization';
 
-export default function FreeTextQuestion({ question, onSubmit, disabled }) {
+export default function FreeTextQuestion({ question, onSubmit, disabled, language = 'en' }) {
   const [text, setText] = useState('');
+  const [prevId, setPrevId] = useState(question?.id);
+  const strings = getKioskStrings(language);
 
-  useEffect(() => {
+  if (question?.id !== prevId) {
+    setPrevId(question?.id);
     setText('');
-  }, [question?.id]);
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
-    onSubmit(trimmed);
+    onSubmit(trimmed, 'text');
+    setText('');
   };
 
   return (
@@ -23,31 +28,31 @@ export default function FreeTextQuestion({ question, onSubmit, disabled }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={disabled}
-          placeholder="Please describe in your own words (e.g. fever for 3 days, cough, headache)..."
+          placeholder={strings.freeTextPlaceholder}
           rows={4}
           autoFocus
         />
         {text.length > 0 && !disabled && (
           <button
             type="button"
-            className="absolute top-4 right-4 text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+            className="absolute top-4 right-4 text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
             onClick={() => setText('')}
           >
-            <FaTimes /> Clear
+            <FaTimes /> {strings.clear}
           </button>
         )}
       </div>
 
       <div className="flex justify-between items-center pt-2">
         <span className="text-xs text-slate-400 font-semibold">
-          {text.trim().length === 0 ? 'Please enter your response above' : `${text.trim().length} characters`}
+          {text.trim().length === 0 ? strings.enterResponseAbove : `${text.trim().length} ${strings.characters}`}
         </span>
         <button
           type="submit"
           className="teal-grad text-white font-bold text-base sm:text-lg px-8 py-3.5 rounded-xl shadow-md shadow-teal-300/40 hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           disabled={disabled || !text.trim()}
         >
-          <span>Submit Response</span>
+          <span>{strings.submitResponse}</span>
           <FaArrowRight className="text-sm" />
         </button>
       </div>

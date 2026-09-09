@@ -11,7 +11,7 @@ export default function SingleSelectQuestion({ question, onSubmit, disabled }) {
           key={option.value}
           type="button"
           className="group relative flex items-center justify-between min-h-[64px] px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white hover:border-teal-500 hover:bg-teal-50/40 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-teal-500 text-left transition-all duration-150 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-          onClick={() => onSubmit(option.value)}
+          onClick={() => onSubmit(option.value, 'touch')}
           disabled={disabled}
         >
           <span className="font-bold text-base sm:text-lg text-slate-800 group-hover:text-teal-900 pr-3">

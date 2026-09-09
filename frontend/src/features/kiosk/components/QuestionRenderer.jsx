@@ -4,7 +4,7 @@ import MultiSelectQuestion from './MultiSelectQuestion';
 import FreeTextQuestion from './FreeTextQuestion';
 import ScaleQuestion from './ScaleQuestion';
 
-export default function QuestionRenderer({ question, onSubmit, disabled }) {
+export default function QuestionRenderer({ question, onSubmit, disabled, language = 'en' }) {
   if (!question) return null;
 
   switch (question.type) {
@@ -14,6 +14,7 @@ export default function QuestionRenderer({ question, onSubmit, disabled }) {
           question={question}
           onSubmit={onSubmit}
           disabled={disabled}
+          language={language}
         />
       );
     case 'multi_select':
@@ -22,6 +23,7 @@ export default function QuestionRenderer({ question, onSubmit, disabled }) {
           question={question}
           onSubmit={onSubmit}
           disabled={disabled}
+          language={language}
         />
       );
     case 'free_text':
@@ -30,6 +32,7 @@ export default function QuestionRenderer({ question, onSubmit, disabled }) {
           question={question}
           onSubmit={onSubmit}
           disabled={disabled}
+          language={language}
         />
       );
     case 'scale_1_10':
@@ -38,6 +41,7 @@ export default function QuestionRenderer({ question, onSubmit, disabled }) {
           question={question}
           onSubmit={onSubmit}
           disabled={disabled}
+          language={language}
         />
       );
     default:

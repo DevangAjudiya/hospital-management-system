@@ -6,32 +6,146 @@
  * and gTTS speech engine.
  */
 
-const TTS_BASE_URL = import.meta.env.VITE_TTS_API_BASE_URL || 'http://localhost:5001';
+const TTS_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TTS_API_BASE_URL) || 'http://localhost:5001';
 
 export const SUPPORTED_LANGUAGES = [
   {
-    code: 'en',
-    name: 'English',
-    nativeName: 'English',
-    indicCode: 'eng_Latn',
-    speechCode: 'en-IN',
-    ttsSupported: true
+    code: 'as',
+    name: 'Assamese',
+    nativeName: 'অসমীয়া',
+    speechCode: 'as-IN'
   },
   {
-    code: 'hi',
-    name: 'Hindi',
-    nativeName: 'हिन्दी',
-    indicCode: 'hin_Deva',
-    speechCode: 'hi-IN',
-    ttsSupported: true
+    code: 'bn',
+    name: 'Bengali',
+    nativeName: 'বাংলা',
+    speechCode: 'bn-IN'
+  },
+  {
+    code: 'brx',
+    name: 'Bodo',
+    nativeName: 'बड़ो',
+    speechCode: 'brx-IN'
+  },
+  {
+    code: 'doi',
+    name: 'Dogri',
+    nativeName: 'डोगरी',
+    speechCode: 'doi-IN'
+  },
+  {
+    code: 'kok',
+    name: 'Konkani',
+    nativeName: 'कोंकणी',
+    speechCode: 'kok-IN'
   },
   {
     code: 'gu',
     name: 'Gujarati',
     nativeName: 'ગુજરાતી',
-    indicCode: 'guj_Gujr',
-    speechCode: 'gu-IN',
-    ttsSupported: true
+    speechCode: 'gu-IN'
+  },
+  {
+    code: 'hi',
+    name: 'Hindi',
+    nativeName: 'हिन्दी',
+    speechCode: 'hi-IN'
+  },
+  {
+    code: 'kn',
+    name: 'Kannada',
+    nativeName: 'ಕನ್ನಡ',
+    speechCode: 'kn-IN'
+  },
+  {
+    code: 'ks',
+    name: 'Kashmiri',
+    nativeName: 'कॉशुर',
+    speechCode: 'ks-IN'
+  },
+  {
+    code: 'mai',
+    name: 'Maithili',
+    nativeName: 'मैथिली',
+    speechCode: 'mai-IN'
+  },
+  {
+    code: 'ml',
+    name: 'Malayalam',
+    nativeName: 'മലയാളം',
+    speechCode: 'ml-IN'
+  },
+  {
+    code: 'mr',
+    name: 'Marathi',
+    nativeName: 'मराठी',
+    speechCode: 'mr-IN'
+  },
+  {
+    code: 'mni',
+    name: 'Manipuri',
+    nativeName: 'মৈতৈলোন্',
+    speechCode: 'mni-IN'
+  },
+  {
+    code: 'ne',
+    name: 'Nepali',
+    nativeName: 'नेपाली',
+    speechCode: 'ne-NP'
+  },
+  {
+    code: 'or',
+    name: 'Odia',
+    nativeName: 'ଓଡ଼ିଆ',
+    speechCode: 'or-IN'
+  },
+  {
+    code: 'pa',
+    name: 'Punjabi',
+    nativeName: 'ਪੰਜਾਬੀ',
+    speechCode: 'pa-IN'
+  },
+  {
+    code: 'sa',
+    name: 'Sanskrit',
+    nativeName: 'संस्कृतम्',
+    speechCode: 'sa-IN'
+  },
+  {
+    code: 'sat',
+    name: 'Santali',
+    nativeName: 'ᱥᱟᱱᱛᱟᱲᱤ',
+    speechCode: 'sat-IN'
+  },
+  {
+    code: 'sd',
+    name: 'Sindhi',
+    nativeName: 'سنڌي',
+    speechCode: 'sd-IN'
+  },
+  {
+    code: 'ta',
+    name: 'Tamil',
+    nativeName: 'தமிழ்',
+    speechCode: 'ta-IN'
+  },
+  {
+    code: 'te',
+    name: 'Telugu',
+    nativeName: 'తెలుగు',
+    speechCode: 'te-IN'
+  },
+  {
+    code: 'ur',
+    name: 'Urdu',
+    nativeName: 'اردو',
+    speechCode: 'ur-IN'
+  },
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    speechCode: 'en-IN'
   }
 ];
 
@@ -40,9 +154,13 @@ export function getSupportedLanguages() {
 }
 
 export function getLanguageByCode(code = 'en') {
-  if (!code) return SUPPORTED_LANGUAGES[0];
+  if (!code) return SUPPORTED_LANGUAGES.find(l => l.code === 'en') || SUPPORTED_LANGUAGES[0];
   const normalized = code.split('-')[0].toLowerCase();
-  return SUPPORTED_LANGUAGES.find(l => l.code === normalized) || SUPPORTED_LANGUAGES[0];
+  return (
+    SUPPORTED_LANGUAGES.find(l => l.code === normalized) ||
+    SUPPORTED_LANGUAGES.find(l => l.code === 'en') ||
+    SUPPORTED_LANGUAGES[0]
+  );
 }
 
 export function isLanguageSupported(code) {

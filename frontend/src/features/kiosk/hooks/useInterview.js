@@ -4,12 +4,14 @@ import { convertBlobToWav } from '../utils/audioConverter';
 import { triggerStaffAlert, buildAlertPayload } from '../services/alertTriggerApi';
 import { playTextToSpeech, stopSpeech } from '../services/languageService';
 
-export function useInterview(initialLanguage = 'en') {
+export function useInterview(initialLanguage = 'en', initialAssessmentType = 'modern') {
   const [sessionId, setSessionId] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [selectedLanguage, setSelectedLanguage] = useState(initialLanguage || 'en');
-  const [assessmentType, setAssessmentType] = useState('modern');
-  const [ayushAssessments, setAyushAssessments] = useState([]);
+  const [assessmentType, setAssessmentType] = useState(initialAssessmentType || 'modern');
+  const [ayushAssessments, setAyushAssessments] = useState(
+    initialAssessmentType === 'ayush' ? ['dashavidha_pariksha', 'ahara_vihara'] : []
+  );
   
   const [isLoading, setIsLoading] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -28,8 +30,10 @@ export function useInterview(initialLanguage = 'en') {
   // read the current value without stale-closure risk.
   const sessionIdRef = useRef(null);
   const selectedLanguageRef = useRef(initialLanguage || 'en');
-  const assessmentTypeRef = useRef('modern');
-  const ayushAssessmentsRef = useRef([]);
+  const assessmentTypeRef = useRef(initialAssessmentType || 'modern');
+  const ayushAssessmentsRef = useRef(
+    initialAssessmentType === 'ayush' ? ['dashavidha_pariksha', 'ahara_vihara'] : []
+  );
   const isLoadingRef = useRef(false);
   const isTranscribingRef = useRef(false);
   const isAiSpeakingRef = useRef(false);
@@ -54,6 +58,17 @@ export function useInterview(initialLanguage = 'en') {
       setSelectedLanguage(initialLanguage);
     }
   }, [initialLanguage]);
+
+  // Synchronize assessmentType when initialAssessmentType prop changes
+  useEffect(() => {
+    if (initialAssessmentType) {
+      assessmentTypeRef.current = initialAssessmentType;
+      setAssessmentType(initialAssessmentType);
+      const defaultAyush = initialAssessmentType === 'ayush' ? ['dashavidha_pariksha', 'ahara_vihara'] : [];
+      ayushAssessmentsRef.current = defaultAyush;
+      setAyushAssessments(defaultAyush);
+    }
+  }, [initialAssessmentType]);
 
   // Stop audio on unmount
   useEffect(() => {
@@ -152,9 +167,12 @@ export function useInterview(initialLanguage = 'en') {
     }
   }, []);
 
-  const startInterview = useCallback(async (lang, type, initialComplaint = '', inputMode = 'touch') => {
+  const startInterview = useCallback(async (lang, type, initialComplaint = '', inputMode = 'touch', customAyush = null) => {
     const targetLang = lang || selectedLanguageRef.current || 'en';
     const targetType = type || assessmentTypeRef.current || 'modern';
+    const targetAyush = targetType === 'ayush'
+      ? (Array.isArray(customAyush) && customAyush.length > 0 ? customAyush : (ayushAssessmentsRef.current.length > 0 ? ayushAssessmentsRef.current : ['dashavidha_pariksha', 'ahara_vihara']))
+      : [];
 
     stopSpeech();
     syncSetIsAiSpeaking(false);
@@ -164,10 +182,11 @@ export function useInterview(initialLanguage = 'en') {
     setError(null);
     syncSetSelectedLanguage(targetLang);
     syncSetAssessmentType(targetType);
-    setLastAction(() => () => startInterview(targetLang, targetType, initialComplaint, inputMode));
+    syncSetAyushAssessments(targetAyush);
+    setLastAction(() => () => startInterview(targetLang, targetType, initialComplaint, inputMode, targetAyush));
     
     try {
-      const data = await apiStartInterview(targetLang, targetType, initialComplaint, inputMode);
+      const data = await apiStartInterview(targetLang, targetType, initialComplaint, inputMode, targetAyush);
       handleApiResponse(data);
       setError(null);
     } catch (err) {
@@ -321,8 +340,8 @@ export function useInterview(initialLanguage = 'en') {
     console.log('[VOICE] sessionId at this point:', sessionIdRef.current);
 
     if (!sessionIdRef.current) {
-      console.log('[VOICE] Submitting initial voice complaint to startInterview with language:', activeLang);
-      await startInterview(activeLang, assessmentTypeRef.current, transcript, 'voice');
+      console.log('[VOICE] Submitting initial voice complaint to startInterview with language:', activeLang, 'assessmentType:', assessmentTypeRef.current);
+      await startInterview(activeLang, assessmentTypeRef.current, transcript, 'voice', ayushAssessmentsRef.current);
     } else {
       console.log('[VOICE] Calling submitAnswer() with transcript:', transcript, 'inputMode: voice', 'language:', activeLang);
       await submitAnswer(transcript, 'voice', activeLang);
