@@ -28,7 +28,7 @@ import {
   FaVolumeHigh,
   FaVolumeXmark,
   FaCheck,
-  FaTimes,
+  FaXmark,
   FaArrowRight,
   FaMicrophone,
   FaFileLines,
@@ -36,7 +36,7 @@ import {
   FaLock
 } from 'react-icons/fa6';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 const CONSENT_PURPOSE = 'kiosk-consultation';
 const CONSENT_EXPIRY_HOURS = 4; // local session expiry
 
@@ -314,7 +314,7 @@ export default function KioskConsentPage() {
               className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-transparent hover:bg-red-500/10 border border-red-400/40 hover:border-red-400/60 text-red-400 font-bold text-base rounded-2xl transition-all cursor-pointer"
               id="kiosk-consent-decline-btn"
             >
-              <FaTimes />
+              <FaXmark />
               <span>{labels.decline}</span>
             </button>
           </div>

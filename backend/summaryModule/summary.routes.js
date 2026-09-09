@@ -50,7 +50,9 @@ router.post('/generate',
         const alreadyExists = existingDoc.documentTimeline.some(existing => {
           if (existing.event !== item.event || existing.sourceDocument !== item.sourceDocument) return false;
           if (item.type === 'prescription') {
-            return new Date(existing.date).getTime() === new Date(item.date).getTime();
+            const existingTime = existing.date ? new Date(existing.date).getTime() : 0;
+            const itemTime = item.date ? new Date(item.date).getTime() : 0;
+            return existingTime !== 0 && !isNaN(existingTime) && !isNaN(itemTime) && existingTime === itemTime;
           }
           return true; // lab entries have no real date — event+sourceDocument match is enough
         });
@@ -64,37 +66,47 @@ router.post('/generate',
     }
     // ★★★ NEW BLOCK END
 
-        // ★★★ NEW BLOCK — preserve existing narrative fields when this call
+    // ★★★ NEW BLOCK — preserve existing narrative fields when this call
     // brought no new interviewData, instead of letting mock fallback
     // (or an unrelated document-only call) silently overwrite real saved text
     const hadNewInterviewData = Boolean(interviewData);
     let textFields;
     if (hadNewInterviewData) {
       textFields = {
-        chiefComplaint: structuredSummary.chiefComplaint,
-        hpi: structuredSummary.hpi,
-        pastHistory: structuredSummary.pastHistory,
-        drugHistory: structuredSummary.drugHistory,
-        familyHistory: structuredSummary.familyHistory,
-        personalHistory: structuredSummary.personalHistory,
-        ros: structuredSummary.ros,
-        languageOutputs: structuredSummary.languageOutputs,
-        redFlagDetected: structuredSummary.redFlagDetected
+        chiefComplaint: structuredSummary.chiefComplaint || '',
+        hpi: structuredSummary.hpi || '',
+        pastHistory: structuredSummary.pastHistory || '',
+        drugHistory: structuredSummary.drugHistory || '',
+        familyHistory: structuredSummary.familyHistory || '',
+        personalHistory: structuredSummary.personalHistory || '',
+        ros: structuredSummary.ros || [],
+        languageOutputs: structuredSummary.languageOutputs || { en: '', hi: '' },
+        redFlagDetected: Boolean(structuredSummary.redFlagDetected)
       };
     } else if (existingDoc) {
       textFields = {
-        chiefComplaint: existingDoc.chiefComplaint,
-        hpi: existingDoc.hpi,
-        pastHistory: existingDoc.pastHistory,
-        drugHistory: existingDoc.drugHistory,
-        familyHistory: existingDoc.familyHistory,
-        personalHistory: existingDoc.personalHistory,
-        ros: existingDoc.ros,
-        languageOutputs: existingDoc.languageOutputs,
-        redFlagDetected: existingDoc.redFlagDetected
+        chiefComplaint: existingDoc.chiefComplaint || '',
+        hpi: existingDoc.hpi || '',
+        pastHistory: existingDoc.pastHistory || '',
+        drugHistory: existingDoc.drugHistory || '',
+        familyHistory: existingDoc.familyHistory || '',
+        personalHistory: existingDoc.personalHistory || '',
+        ros: existingDoc.ros || [],
+        languageOutputs: existingDoc.languageOutputs || { en: '', hi: '' },
+        redFlagDetected: Boolean(existingDoc.redFlagDetected)
       };
     } else {
-      textFields = structuredSummary; // brand-new patient, nothing to preserve — mock fallback is fine here
+      textFields = {
+        chiefComplaint: structuredSummary.chiefComplaint || '',
+        hpi: structuredSummary.hpi || '',
+        pastHistory: structuredSummary.pastHistory || '',
+        drugHistory: structuredSummary.drugHistory || '',
+        familyHistory: structuredSummary.familyHistory || '',
+        personalHistory: structuredSummary.personalHistory || '',
+        ros: structuredSummary.ros || [],
+        languageOutputs: structuredSummary.languageOutputs || { en: '', hi: '' },
+        redFlagDetected: Boolean(structuredSummary.redFlagDetected)
+      };
     }
 
     // ★★★ NEW BLOCK — same problem, same fix, for investigations: a call with
