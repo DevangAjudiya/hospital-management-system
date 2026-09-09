@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { FaArrowRight } from 'react-icons/fa';
+import { getKioskStrings } from '../utils/kioskLocalization';
 
-export default function ScaleQuestion({ onSubmit, disabled }) {
+export default function ScaleQuestion({ onSubmit, disabled, language = 'en' }) {
   const [value, setValue] = useState(5);
+  const strings = getKioskStrings(language);
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
     const num = Number(value);
     if (isNaN(num) || num < 1 || num > 10 || disabled) return;
-    onSubmit(num);
+    onSubmit(num, 'touch');
   };
 
   const getSeverityBadge = (val) => {
-    if (val <= 3) return { text: 'Mild discomfort', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    if (val <= 6) return { text: 'Moderate intensity', color: 'bg-amber-50 text-amber-700 border-amber-200' };
-    return { text: 'Severe / Intense', color: 'bg-rose-50 text-rose-700 border-rose-200' };
+    if (val <= 3) return { text: strings.mildDiscomfort, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    if (val <= 6) return { text: strings.moderateIntensity, color: 'bg-amber-50 text-amber-700 border-amber-200' };
+    return { text: strings.severeIntense, color: 'bg-rose-50 text-rose-700 border-rose-200' };
   };
 
   const badge = getSeverityBadge(value);
@@ -23,7 +25,7 @@ export default function ScaleQuestion({ onSubmit, disabled }) {
     <div className="space-y-6 my-4">
       <div className="flex items-center justify-between">
         <span className="text-xs font-black uppercase tracking-wider text-slate-500">
-          Touch a number from 1 to 10
+          {strings.touchNumber1To10}
         </span>
         <span className={`text-xs font-bold px-3 py-1 rounded-full border ${badge.color}`}>
           {badge.text}
@@ -55,9 +57,9 @@ export default function ScaleQuestion({ onSubmit, disabled }) {
       {/* Slider representation */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-2">
         <div className="flex justify-between text-xs font-bold text-slate-400">
-          <span>1 = Mild</span>
-          <span className="text-sm font-black text-teal-700">Selected: {value} / 10</span>
-          <span>10 = Severe</span>
+          <span>1 = {strings.mild}</span>
+          <span className="text-sm font-black text-teal-700">{strings.selected}: {value} / 10</span>
+          <span>10 = {strings.severe}</span>
         </div>
         <input
           type="range"
@@ -77,7 +79,7 @@ export default function ScaleQuestion({ onSubmit, disabled }) {
           onClick={handleSubmit}
           disabled={disabled || value < 1 || value > 10}
         >
-          <span>Confirm Rating ({value})</span>
+          <span>{strings.confirmRating} ({value})</span>
           <FaArrowRight className="text-sm" />
         </button>
       </div>

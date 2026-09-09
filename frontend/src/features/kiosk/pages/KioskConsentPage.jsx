@@ -21,7 +21,7 @@
  *   → navigate back to /kiosk
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FaShieldHeart,
@@ -36,55 +36,30 @@ import {
   FaLock
 } from 'react-icons/fa6';
 
+import { getLanguageByCode } from '../services/languageService';
+import { getKioskStrings } from '../utils/kioskLocalization';
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 const CONSENT_PURPOSE = 'kiosk-consultation';
 const CONSENT_EXPIRY_HOURS = 4; // local session expiry
-
-// ─── Consent explanation text ──────────────────────────────────────────────────
-const CONSENT_SPEECH = {
-  en: `Welcome. Before we begin, we need your permission to collect and process your health information. 
-       During this session, we will collect your spoken answers and symptom information using Module A, 
-       any medical documents you upload using Module B, 
-       and generate a clinical summary using Module C.
-       This information will be used only to support your consultation with our doctors today. 
-       You may decline at any time. 
-       Press "I Consent" to continue, or "Decline" to exit.`,
-  hi: `स्वागत है। शुरू करने से पहले, हमें आपकी स्वास्थ्य जानकारी एकत्र करने और संसाधित करने की अनुमति चाहिए।
-       इस सत्र में, हम आपके बोले गए उत्तर और लक्षण जानकारी एकत्र करेंगे,
-       आपके द्वारा अपलोड किए गए चिकित्सा दस्तावेज़, और एक नैदानिक सारांश तैयार करेंगे।
-       यह जानकारी केवल आज आपके डॉक्टर के साथ परामर्श के लिए उपयोग की जाएगी।
-       आप किसी भी समय अस्वीकार कर सकते हैं।
-       जारी रखने के लिए "मैं सहमत हूँ" दबाएँ, या बाहर निकलने के लिए "अस्वीकार करें" दबाएँ।`,
-  gu: `સ્વાગત છે. શરૂ કરતા પહેલા, અમને તમારી આરોગ્ય માહિતી એકત્ર કરવા અને પ્રક્રિયા કરવાની પરવાનગી જોઈએ છે.
-       આ સત્ર દરમિયાન, અમે તમારા બોલેલા જવાબો અને લક્ષણ માહિતી, 
-       અને ક્લિનિકલ સારાંશ બનાવીશું.
-       આ માહિતી ફક્ત આજના ડૉક્ટર સાથેના પરામર્શ માટે ઉપયોગ થશે.
-       "હું સંમત છું" દબાવો અથવા "નકારો" દબાવો.`
-};
-
-const CONSENT_LABELS = {
-  en: { hear: 'Hear Instructions', stop: 'Stop', consent: 'I Consent', decline: 'Decline', loading: 'Saving consent...' },
-  hi: { hear: 'निर्देश सुनें', stop: 'रोकें', consent: 'मैं सहमत हूँ', decline: 'अस्वीकार करें', loading: 'सहमति सहेजी जा रही है...' },
-  gu: { hear: 'સૂચનાઓ સાંભળો', stop: 'રોકો', consent: 'હું સંમત છું', decline: 'નકારો', loading: 'સહમતિ સાચવી રહ્યા છીએ...' }
-};
 
 export default function KioskConsentPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const language = location.state?.language || 'en';
-  const assessmentType = location.state?.assessmentType || 'modern';
+  const language = location.state?.language || localStorage.getItem('kiosk_language') || 'en';
+  const assessmentType = location.state?.assessmentType || localStorage.getItem('kiosk_assessment_type') || 'modern';
   const patientId = location.state?.patientId || null;
+
+  const strings = getKioskStrings(language);
 
   // audioConsentProvided: tracks ONLY explicit click on [Hear Instructions]
   // Never inferred from page load, autoplay, or speech synthesis availability.
   const [audioConsentProvided, setAudioConsentProvided] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [consentState, setConsentState] = useState('CONSENT_PENDING'); // state machine
+  const [_consentState, setConsentState] = useState('CONSENT_PENDING'); // state machine
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const labels = CONSENT_LABELS[language] || CONSENT_LABELS.en;
 
   // Log CONSENT_VIEWED on mount (audit only)
   useEffect(() => {
@@ -106,15 +81,27 @@ export default function KioskConsentPage() {
   // ── [Hear Instructions] ──────────────────────────────────────────────────────
   const handleHearInstructions = () => {
     if (!('speechSynthesis' in window)) {
-      alert('Audio instructions are not supported by this browser.');
+      alert(strings.audioInstructionsUnavailable || 'Audio instructions are not supported by this browser.');
       return;
     }
     window.speechSynthesis.cancel();
 
-    const text = CONSENT_SPEECH[language] || CONSENT_SPEECH.en;
+    const langConfig = getLanguageByCode(language);
+    const text = strings.consentSpeech || strings.description;
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langConfig.speechCode;
     utterance.rate = 0.85;
     utterance.pitch = 1;
+
+    try {
+      const voices = window.speechSynthesis.getVoices();
+      const voice =
+        voices.find(v => v.lang.toLowerCase() === langConfig.speechCode.toLowerCase()) ||
+        voices.find(v => v.lang.toLowerCase().startsWith(langConfig.code.toLowerCase()));
+      if (voice) utterance.voice = voice;
+    } catch {
+      // ignore
+    }
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
@@ -203,7 +190,7 @@ export default function KioskConsentPage() {
       }).catch(err => console.warn('[Consent] Could not log decline:', err.message));
     }
 
-    navigate('/kiosk');
+    navigate('/kiosk', { state: { language } });
   };
 
   return (
@@ -214,8 +201,8 @@ export default function KioskConsentPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-500/20 border border-teal-400/30 text-teal-400 text-3xl mb-4">
             <FaShieldHeart />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Your Privacy & Consent</h1>
-          <p className="text-slate-400 text-base">Please review before we begin your consultation</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{strings.privacyAndConsent}</h1>
+          <p className="text-slate-400 text-base">{strings.reviewBeforeBegin}</p>
         </div>
 
         {/* Consent Card */}
@@ -224,13 +211,13 @@ export default function KioskConsentPage() {
           {/* What will be collected */}
           <h2 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
             <FaLock className="text-teal-400 text-sm" />
-            What information will be collected
+            {strings.whatWillBeCollected}
           </h2>
           <div className="space-y-3 mb-6">
             {[
-              { icon: <FaMicrophone />, label: 'Module A', desc: 'Your spoken answers and symptom descriptions during the AI interview' },
-              { icon: <FaFileLines />, label: 'Module B', desc: 'Any medical documents or lab reports you choose to upload' },
-              { icon: <FaBrain />, label: 'Module C', desc: 'A clinical summary generated from the above, shared with your doctor' }
+              { icon: <FaMicrophone />, label: strings.moduleA, desc: strings.moduleADesc },
+              { icon: <FaFileLines />, label: strings.moduleB, desc: strings.moduleBDesc },
+              { icon: <FaBrain />, label: strings.moduleC, desc: strings.moduleCDesc }
             ].map(item => (
               <div key={item.label} className="flex items-start gap-3 bg-white/5 rounded-xl p-3">
                 <div className="text-teal-400 mt-0.5 flex-shrink-0">{item.icon}</div>
@@ -244,10 +231,10 @@ export default function KioskConsentPage() {
 
           {/* Purpose + rights */}
           <div className="bg-teal-500/10 border border-teal-400/20 rounded-xl p-4 mb-6 text-sm text-slate-300">
-            <p className="mb-1">✓ Used <strong>only</strong> for today's consultation with our medical staff</p>
-            <p className="mb-1">✓ Stored securely in compliance with health data regulations</p>
-            <p className="mb-1">✓ You may <strong>decline at any time</strong> without affecting your care</p>
-            <p>✓ Declining means AI-assisted clinical modules will not be used</p>
+            <p className="mb-1">✓ {strings.consentPoint1}</p>
+            <p className="mb-1">✓ {strings.consentPoint2}</p>
+            <p className="mb-1">✓ {strings.consentPoint3}</p>
+            <p>✓ {strings.consentPoint4}</p>
           </div>
 
           {/* Hear Instructions button */}
@@ -259,7 +246,7 @@ export default function KioskConsentPage() {
                 className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-semibold rounded-xl transition-all cursor-pointer text-sm"
               >
                 <FaVolumeHigh className="text-teal-400" />
-                <span>{labels.hear}</span>
+                <span>{strings.hear}</span>
                 {audioConsentProvided && <FaCheck className="text-emerald-400 text-xs" />}
               </button>
             ) : (
@@ -269,14 +256,14 @@ export default function KioskConsentPage() {
                 className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-all cursor-pointer text-sm animate-pulse"
               >
                 <FaVolumeXmark />
-                <span>{labels.stop}</span>
+                <span>{strings.stop}</span>
               </button>
             )}
           </div>
 
           {audioConsentProvided && (
             <p className="text-center text-xs text-emerald-400 mb-4 flex items-center justify-center gap-1">
-              <FaCheck /> Audio instructions confirmed
+              <FaCheck /> {strings.audioConfirmed}
             </p>
           )}
 
@@ -297,11 +284,11 @@ export default function KioskConsentPage() {
               id="kiosk-consent-grant-btn"
             >
               {loading ? (
-                <span>{labels.loading}</span>
+                <span>{strings.savingConsent}</span>
               ) : (
                 <>
                   <FaCheck />
-                  <span>{labels.consent}</span>
+                  <span>{strings.iConsent}</span>
                   <FaArrowRight className="text-sm" />
                 </>
               )}
@@ -315,13 +302,13 @@ export default function KioskConsentPage() {
               id="kiosk-consent-decline-btn"
             >
               <FaXmark />
-              <span>{labels.decline}</span>
+              <span>{strings.decline}</span>
             </button>
           </div>
         </div>
 
         <p className="text-center text-slate-500 text-xs">
-          MultiSpecialist Hospital • Patient Data Protection Policy
+          {strings.policyFooter}
         </p>
       </div>
     </div>

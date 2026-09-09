@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { FaCheck, FaArrowRight } from 'react-icons/fa';
+import { getKioskStrings } from '../utils/kioskLocalization';
 
-export default function MultiSelectQuestion({ question, onSubmit, disabled }) {
+export default function MultiSelectQuestion({ question, onSubmit, disabled, language = 'en' }) {
   const [selected, setSelected] = useState(new Set());
+  const strings = getKioskStrings(language);
 
   if (!question || !Array.isArray(question.options)) return null;
 
@@ -28,13 +30,13 @@ export default function MultiSelectQuestion({ question, onSubmit, disabled }) {
 
   const handleSubmit = () => {
     if (selected.size === 0 || disabled) return;
-    onSubmit(Array.from(selected));
+    onSubmit(Array.from(selected), 'touch');
   };
 
   return (
     <div className="space-y-6 my-4">
       <div className="text-xs font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-3 py-1.5 rounded-full inline-block border border-teal-200">
-        Select all that apply
+        {strings.selectAllThatApply}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -76,7 +78,7 @@ export default function MultiSelectQuestion({ question, onSubmit, disabled }) {
           onClick={handleSubmit}
           disabled={disabled || selected.size === 0}
         >
-          <span>Continue {selected.size > 0 ? `(${selected.size} selected)` : ''}</span>
+          <span>{strings.continueBtn} {selected.size > 0 ? `(${selected.size})` : ''}</span>
           <FaArrowRight className="text-sm" />
         </button>
       </div>

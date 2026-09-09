@@ -18,7 +18,14 @@ import KioskNavbar from '../components/KioskNavbar';
 import VoiceRecorder from '../components/VoiceRecorder';
 import { getKioskStrings, getLocalizedPhaseMeta } from '../utils/kioskLocalization';
 
-const PHASES = [
+const MODERN_PHASES = [
+  { key: 'chief_complaint' },
+  { key: 'hpi' },
+  { key: 'extended_history' },
+  { key: 'ros' }
+];
+
+const AYUSH_PHASES = [
   { key: 'chief_complaint' },
   { key: 'hpi' },
   { key: 'extended_history' },
@@ -34,7 +41,7 @@ export default function KioskInterview() {
   const patientId = location.state?.patientId || localStorage.getItem("hmsPatientId") || user.patientId || null;
 
   const selectedLanguage = location.state?.language || localStorage.getItem('kiosk_language') || 'en';
-  const assessmentType = location.state?.assessmentType || 'modern';
+  const assessmentType = location.state?.assessmentType || localStorage.getItem('kiosk_assessment_type') || 'modern';
 
   const [textComplaint, setTextComplaint] = useState('');
 
@@ -67,7 +74,7 @@ export default function KioskInterview() {
     stopSpeaking,
     retryLastAction,
     resetInterview
-  } = useInterview(selectedLanguage);
+  } = useInterview(selectedLanguage, assessmentType);
 
   // Reset interview state on unmount
   useEffect(() => {
@@ -161,22 +168,23 @@ export default function KioskInterview() {
     navigate('/kiosk', { state: { language: selectedLanguage } });
   };
 
-  const handleTouchSubmit = async (answer) => {
+  const handleAnswerSubmit = async (answer, mode = 'touch') => {
     stopSpeaking();
-    await submitAnswer(answer, 'touch', selectedLanguage);
+    await submitAnswer(answer, mode, selectedLanguage);
   };
 
   const handleTextComplaintSubmit = async () => {
     if (!textComplaint.trim() || isLoading || isTranscribing || isAiSpeaking) return;
     stopSpeaking();
-    await startInterview(selectedLanguage, assessmentType, textComplaint.trim(), 'touch');
+    await startInterview(selectedLanguage, assessmentType, textComplaint.trim(), 'text');
   };
 
+  const activePhases = assessmentType === 'ayush' ? AYUSH_PHASES : MODERN_PHASES;
   const currentSection = currentQuestion?.section || 'chief_complaint';
   const phaseMeta = getLocalizedPhaseMeta(currentSection, selectedLanguage);
 
   // Find index of current phase for dynamic progress indicator
-  const activePhaseIndex = PHASES.findIndex(p => p.key === currentSection);
+  const activePhaseIndex = activePhases.findIndex(p => p.key === currentSection);
 
   // Completion screen (normal or urgent alert)
   if (interviewComplete || alertTriggered) {
@@ -221,7 +229,7 @@ export default function KioskInterview() {
 
       {/* Hospital Branding Header */}
       <KioskNavbar
-        topBarTag={strings.consultationTitle}
+        topBarTag={assessmentType === 'ayush' ? strings.ayushConsultation : (strings.modernConsultation || strings.consultationTitle)}
         rightAction={
           <button
             type="button"
@@ -237,7 +245,7 @@ export default function KioskInterview() {
       {/* Dynamic Phase Progression Tracker */}
       <div className="bg-white/80 border-b border-slate-200/80 px-6 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between overflow-x-auto gap-2 py-1 scrollbar-none">
-          {PHASES.map((p, idx) => {
+          {activePhases.map((p, idx) => {
             const pMeta = getLocalizedPhaseMeta(p.key, selectedLanguage);
             const isCurrent = p.key === currentSection;
             const isCompleted = activePhaseIndex > idx;
@@ -245,9 +253,9 @@ export default function KioskInterview() {
               <div key={p.key} className="flex items-center gap-2 flex-shrink-0">
                 <div
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${isCurrent
-                    ? 'bg-teal-600 text-white shadow-sm'
+                    ? (assessmentType === 'ayush' ? 'bg-emerald-700 text-white shadow-sm' : 'bg-teal-600 text-white shadow-sm')
                     : isCompleted
-                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                      ? (assessmentType === 'ayush' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-teal-50 text-teal-700 border border-teal-200')
                       : 'bg-slate-100 text-slate-400'
                     }`}
                 >
@@ -260,8 +268,8 @@ export default function KioskInterview() {
                   )}
                   <span>{pMeta.title}</span>
                 </div>
-                {idx < PHASES.length - 1 && (
-                  <div className={`w-4 sm:w-8 h-0.5 ${isCompleted ? 'bg-teal-300' : 'bg-slate-200'}`} />
+                {idx < activePhases.length - 1 && (
+                  <div className={`w-4 sm:w-8 h-0.5 ${isCompleted ? (assessmentType === 'ayush' ? 'bg-emerald-300' : 'bg-teal-300') : 'bg-slate-200'}`} />
                 )}
               </div>
             );
@@ -295,9 +303,18 @@ export default function KioskInterview() {
             {/* Top Phase Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
-                  <FaStethoscope className="text-[11px]" />
-                  <span>{phaseMeta.title}</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                    <FaStethoscope className="text-[11px]" />
+                    <span>{phaseMeta.title}</span>
+                  </div>
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                    assessmentType === 'ayush'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                      : 'bg-teal-50 text-teal-800 border border-teal-300'
+                  }`}>
+                    <span>{assessmentType === 'ayush' ? strings.ayushConsultation : strings.modernConsultation}</span>
+                  </div>
                 </div>
                 <div className="text-xs text-slate-400 font-semibold mt-1">
                   {phaseMeta.subtitle}
@@ -386,9 +403,18 @@ export default function KioskInterview() {
             {/* Top Phase Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
-                  <FaStethoscope className="text-[11px]" />
-                  <span>{phaseMeta.title}</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                    <FaStethoscope className="text-[11px]" />
+                    <span>{phaseMeta.title}</span>
+                  </div>
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                    assessmentType === 'ayush'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                      : 'bg-teal-50 text-teal-800 border border-teal-300'
+                  }`}>
+                    <span>{assessmentType === 'ayush' ? strings.ayushConsultation : strings.modernConsultation}</span>
+                  </div>
                 </div>
                 <div className="text-xs text-slate-400 font-semibold mt-1">
                   {phaseMeta.subtitle}
@@ -448,12 +474,13 @@ export default function KioskInterview() {
               <div className="flex-1 h-px bg-slate-200" />
             </div>
 
-            {/* Touch Question Option Input Widgets */}
+            {/* Touch / Text Question Option Input Widgets */}
             <div className="mt-2">
               <QuestionRenderer
                 question={currentQuestion}
-                onSubmit={handleTouchSubmit}
+                onSubmit={handleAnswerSubmit}
                 disabled={isLoading || isTranscribing || isAiSpeaking}
+                language={selectedLanguage}
               />
             </div>
           </div>

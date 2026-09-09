@@ -30,12 +30,22 @@ function getAuthHeader() {
  * Starts a new interview session.
  * Routed through: POST /api/kiosk/interview (consent-gated Node proxy)
  */
-export async function startInterview(language = 'en', assessmentType = 'modern', initialComplaint = '', inputMode = 'touch') {
+export async function startInterview(
+  language = 'en',
+  assessmentType = 'modern',
+  initialComplaint = '',
+  inputMode = 'touch',
+  ayushAssessments = null
+) {
+  const resolvedAyush = assessmentType === 'ayush'
+    ? (Array.isArray(ayushAssessments) && ayushAssessments.length > 0 ? ayushAssessments : ['dashavidha_pariksha', 'ahara_vihara'])
+    : [];
+
   const payload = {
     input_mode: inputMode || 'touch',
     language: language || 'en',
     assessment_type: assessmentType || 'modern',
-    ayush_assessments: assessmentType === 'ayush' ? ['dashavidha_pariksha'] : [],
+    ayush_assessments: resolvedAyush,
     patient_id: null,
     patient_message: initialComplaint || ""
   };
@@ -73,6 +83,10 @@ export async function submitInterviewAnswer(
   inputMode = 'touch',
   ayushAssessments = []
 ) {
+  const resolvedAyush = assessmentType === 'ayush'
+    ? (Array.isArray(ayushAssessments) && ayushAssessments.length > 0 ? ayushAssessments : ['dashavidha_pariksha', 'ahara_vihara'])
+    : [];
+
   const payload = {
     session_id: sessionId,
     patient_id: null,
@@ -80,7 +94,7 @@ export async function submitInterviewAnswer(
     patient_message: patientMessage,
     language: language || 'en',
     assessment_type: assessmentType || 'modern',
-    ayush_assessments: ayushAssessments || []
+    ayush_assessments: resolvedAyush
   };
 
   const startTime = performance.now();
