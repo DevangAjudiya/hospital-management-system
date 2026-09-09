@@ -22,30 +22,25 @@ function normalizePrescription(analyzeResponse) {
 function normalizeLabReport(analyzeResponse) {
   if (!analyzeResponse || !Array.isArray(analyzeResponse.tests)) return [];
 
-  const realTests = analyzeResponse.tests.filter(t => t.range_source === 'report_flag');
+  const realTests = analyzeResponse.tests.filter(t => t && (t.range_source === 'report_flag' || t.test_name));
 
   return realTests.map(test => ({
-    // No structured date field in Devang's lab response yet — using processing
-    // date as a placeholder. Revisit once/if he adds a report date field.
     date: new Date(),
-    event: `${test.test_name}: ${test.value}${test.unit ? ' ' + test.unit : ''} (${test.status})`,
+    event: `${test.test_name || 'Lab Test'}: ${test.value !== undefined && test.value !== null ? test.value : ''}${test.unit ? ' ' + test.unit : ''}${test.status ? ' (' + test.status + ')' : ''}`,
     sourceDocument: 'Lab Report (OCR)',
     type: 'lab'
   }));
 }
 
-// Separately extracts investigations for the Summary schema's dedicated
-// `investigations` field (name/value/flag) — kept apart from documentTimeline
-// since investigations has its own structured slot in summary.model.js.
 function extractInvestigations(analyzeResponse) {
   if (!analyzeResponse || !Array.isArray(analyzeResponse.tests)) return [];
 
   return analyzeResponse.tests
-    .filter(t => t.range_source === 'report_flag')
+    .filter(t => t && (t.range_source === 'report_flag' || t.test_name))
     .map(t => ({
-      name: t.test_name,
-      value: `${t.value}${t.unit ? ' ' + t.unit : ''}`,
-      flag: t.status // actual values are 'normal'/'high'/'low', not just 'normal'/'abnormal'
+      name: t.test_name || 'Investigation',
+      value: `${t.value !== undefined && t.value !== null ? t.value : ''}${t.unit ? ' ' + t.unit : ''}`.trim() || 'Recorded',
+      flag: t.status || 'normal'
     }));
 }
 

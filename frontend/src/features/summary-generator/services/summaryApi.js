@@ -83,7 +83,17 @@ export async function generateSummary({
     body: JSON.stringify(payload)
   });
 
-  const json = await res.json();
+  let json = {};
+  const rawText = await res.text();
+  if (rawText) {
+    try {
+      json = JSON.parse(rawText);
+    } catch (parseError) {
+      console.error('[SUMMARY API] Non-JSON response from summary backend:', rawText.slice(0, 200));
+      throw new Error('Summary service returned an invalid response. Please try again.');
+    }
+  }
+
   if (!res.ok) {
     throw new Error(json.error || json.message || 'Failed to generate summary');
   }

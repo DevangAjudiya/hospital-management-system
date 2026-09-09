@@ -67,12 +67,78 @@ async function translateTextViaIndicTrans2(englishText, targetLang = 'hi') {
   return `[Translation Error: Python service at port 5001 unreachable]`;
 }
 
+function buildFallbackClinicalSummary(interviewData, documentTimeline) {
+  const safeInterview = interviewData || mockInterview || {};
+  const chiefComplaint = safeInterview.chief_complaint || safeInterview.chiefComplaint || 'Not reported';
+  const hpi = typeof safeInterview.hpi === 'string'
+    ? safeInterview.hpi
+    : flattenQAList(safeInterview.hpi || []);
+
+  // Nisarg's real interview data nests history under extended_history.{section},
+  // but earlier mock/test shapes used flat past_history/drug_history keys.
+  // Support both by checking nested first, then flat, then empty.
+  const ext = safeInterview.extended_history || {};
+
+  const rawPastHistory = safeInterview.past_history || ext.past_medical_history;
+  const pastHistory = typeof rawPastHistory === 'string'
+    ? rawPastHistory
+    : flattenQAList(rawPastHistory || []);
+
+  const rawDrugHistory = safeInterview.drug_history || ext.drug_history;
+  const drugHistory = typeof rawDrugHistory === 'string'
+    ? rawDrugHistory
+    : flattenQAList(rawDrugHistory || []);
+
+  const rawFamilyHistory = safeInterview.family_history || ext.family_history;
+  const familyHistory = typeof rawFamilyHistory === 'string'
+    ? rawFamilyHistory
+    : flattenQAList(rawFamilyHistory || []);
+
+  const rawPersonalHistory = safeInterview.personal_history || ext.personal_history;
+  const personalHistory = typeof rawPersonalHistory === 'string'
+    ? rawPersonalHistory
+    : flattenQAList(rawPersonalHistory || []);
+
+  const ros = Array.isArray(safeInterview.review_of_systems)
+    ? safeInterview.review_of_systems
+    : (safeInterview.review_of_systems ? Object.values(safeInterview.review_of_systems).flatMap(section => Array.isArray(section) ? section.map(item => item.answer || item.question || item) : []) : ['No ROS data recorded.']);
+
+  const narrative = [
+    `Chief Complaint: ${chiefComplaint}.`,
+    `HPI: ${hpi}.`,
+    `Past History: ${pastHistory}.`,
+    `Drug History: ${drugHistory}.`,
+    `Family History: ${familyHistory}.`,
+    `Personal History: ${personalHistory}.`
+  ].join(' ');
+
+  return {
+    chiefComplaint,
+    hpi,
+    pastHistory,
+    drugHistory,
+    familyHistory,
+    personalHistory,
+    ros: Array.isArray(ros) && ros.length ? ros : ['No ROS data recorded.'],
+    investigations: Array.isArray(documentTimeline) ? documentTimeline
+      .filter(item => item && (item.type === 'lab' || item.category === 'investigation' || item.name))
+      .map(item => ({
+        name: item.name || item.event || 'Investigation',
+        value: item.value || item.result || 'Record uploaded',
+        flag: item.flag || 'normal'
+      })) : [],
+    languageOutputs: { en: narrative, hi: '' }
+  };
+}
+
+
 async function generateSummary(incomingInterviewData, incomingTimeline) {
   // Falls back to mock (Nisarg's real clinical_summary shape) when Module A
   // hasn't sent data yet — safe for isolated dev/testing.
   const interviewData = incomingInterviewData || mockInterview;
   const documentTimeline = Array.isArray(incomingTimeline) ? incomingTimeline : [];
-
+  console.log('[SUMMARY] Generating summary for interviewData:', interviewData);
+  console.log('[SUMMARY] Document timeline:', documentTimeline);
   const prompt = `
 You are an expert clinical summarizer for a hospital kiosk system.
 Synthesize the following structured patient interview data (from a conversational
@@ -107,53 +173,67 @@ Respond ONLY as a valid JSON object matching this exact structure:
 }
 `;
 
-  const response = await fetch(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
-      })
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error?.message || 'OpenAI API summarization failed');
-  }
-  const text = data.choices[0].message.content;
   let parsed;
-  
-  try {
-    parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-  } catch (parseErr) {
-    throw new Error('Failed to parse LLM structured output format.');
+  const usingFallback = !process.env.OPENAI_API_KEY;
+
+  if (usingFallback) {
+    console.warn('[SUMMARY] OPENAI_API_KEY missing; using local fallback summary generation.');
+    parsed = buildFallbackClinicalSummary(interviewData, documentTimeline);
+  } else {
+    try {
+      const response = await fetch(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4-turbo',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' }
+          })
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'OpenAI API summarization failed');
+      }
+      const text = data.choices?.[0]?.message?.content;
+      if (!text) {
+        throw new Error('OpenAI response did not include any content.');
+      }
+      parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch (err) {
+      console.warn('[SUMMARY] OpenAI unavailable; using local fallback summary generation.', err.message);
+      parsed = buildFallbackClinicalSummary(interviewData, documentTimeline);
+    }
   }
 
   const englishNarrative = parsed.languageOutputs?.en || `Chief Complaint: ${parsed.chiefComplaint}. HPI: ${parsed.hpi}`;
   parsed.languageOutputs = { en: englishNarrative, hi: '' }; // Hindi generated lazily, on-demand via GET /:id/translate
 
-  const normalizedTimeline = documentTimeline.length > 0
-    ? documentTimeline.map(item => ({
-        date: item.date ? new Date(item.date) : new Date(),
-        event: item.event || item.title || 'Digitized Document Record',
-        sourceDocument: item.sourceDocument || item.documentType || 'Kiosk Upload',
-        type: item.type || 'document'
-      }))
+  const normalizedTimeline = Array.isArray(documentTimeline) && documentTimeline.length > 0
+    ? documentTimeline.map(item => {
+        const d = item.date ? new Date(item.date) : new Date();
+        const safeDate = isNaN(d.getTime()) ? new Date() : d;
+        return {
+          date: safeDate,
+          event: item.event || item.title || 'Digitized Document Record',
+          sourceDocument: item.sourceDocument || item.documentType || 'Kiosk Upload',
+          type: item.type || 'document'
+        };
+      })
     : [{ date: new Date(), event: 'Initial kiosk intake synchronized', sourceDocument: 'System Default' }];
 
   // Carries Nisarg's red-flag signal through — useful once alert routing exists
   return {
     ...parsed,
     documentTimeline: normalizedTimeline,
-    redFlagDetected: interviewData.red_flags?.detected || false
+    redFlagDetected: Boolean(interviewData?.red_flags?.detected || false)
   };
 }
 
