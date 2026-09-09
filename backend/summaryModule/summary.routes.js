@@ -273,13 +273,19 @@ router.get('/:id/translate', async (req, res) => {
     }
 
     const { translateTextViaIndicTrans2 } = require('./summary.service');
-    const hindiTranslation = await translateTextViaIndicTrans2(doc.languageOutputs.en, 'hi');
+    const englishText = doc.languageOutputs?.en;
+    if (!englishText) {
+      return res.status(400).json({ error: 'No English narrative found to translate.' });
+    }
+    const hindiTranslation = await translateTextViaIndicTrans2(englishText, 'hi');
 
-    doc.languageOutputs.hi = hindiTranslation;
+    doc.languageOutputs = { ...doc.languageOutputs, hi: hindiTranslation };
+    doc.markModified('languageOutputs');
     await doc.save();
 
     res.json({ success: true, hi: hindiTranslation });
   } catch (err) {
+    console.error('[translate route] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

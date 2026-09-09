@@ -60,7 +60,7 @@ function proxyRequest(targetUrl, method, headers, bodyBuffer) {
             path: parsed.pathname + (parsed.search || ''),
             method,
             headers: forwardHeaders,
-            timeout: 30000
+            timeout: 120000
         };
 
         const proxyReq = lib.request(options, (proxyRes) => {
@@ -76,7 +76,7 @@ function proxyRequest(targetUrl, method, headers, bodyBuffer) {
         proxyReq.on('error', reject);
         proxyReq.on('timeout', () => {
             proxyReq.destroy();
-            reject(new Error('Upstream document AI service timed out'));
+            reject(new Error('Upstream document AI service timed out after 120s'));
         });
 
         if (bodyBuffer && bodyBuffer.length > 0) {
