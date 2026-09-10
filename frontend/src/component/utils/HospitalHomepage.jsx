@@ -125,8 +125,7 @@ const HospitalHomepage = () => {
               <FaHospital className="text-white text-lg" />
             </div>
             <div>
-              <div className="font-black text-slate-800 text-base leading-tight">MultiSpecialist</div>
-              <div className="text-xs text-teal-600 font-semibold tracking-wide leading-tight">HOSPITAL</div>
+              <div className="font-black text-slate-800 text-base leading-tight">Medikiosk</div>
             </div>
           </div>
 
@@ -268,7 +267,7 @@ const HospitalHomepage = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-emerald-500">Heart & Science</span>
             </h2>
             <p className="text-slate-500 leading-relaxed mb-4">
-              MultiSpecialist Hospital has been a cornerstone of healthcare in our community for over 25 years. We combine cutting-edge medical technology with genuine compassion to deliver exceptional patient outcomes.
+              Medikiosk has been a cornerstone of healthcare in our community for over 25 years. We combine cutting-edge medical technology with genuine compassion to deliver exceptional patient outcomes.
             </p>
             <p className="text-slate-500 leading-relaxed mb-8">
               Our 120+ specialist doctors across 40+ departments work in a fully integrated care model — ensuring every patient receives precise diagnosis, effective treatment, and warm support throughout their healing journey.
@@ -426,8 +425,7 @@ const HospitalHomepage = () => {
                 <FaHospital className="text-white text-lg" />
               </div>
               <div>
-                <div className="font-black text-white text-base leading-tight">MultiSpecialist</div>
-                <div className="text-xs text-teal-400 font-bold tracking-wide">HOSPITAL</div>
+                <div className="font-black text-white text-base leading-tight">Medikiosk</div>
               </div>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
@@ -465,7 +463,7 @@ const HospitalHomepage = () => {
         </div>
 
         <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-slate-500 text-xs">© 2026 MultiSpecialist Hospital · All Rights Reserved</p>
+          <p className="text-slate-500 text-xs">© 2026 Medikiosk · All Rights Reserved</p>
           <div className="flex gap-4">
             {["Privacy Policy", "Terms of Service", "Support"].map(l => (
               <span key={l} className="text-slate-600 hover:text-teal-400 text-xs cursor-pointer transition">{l}</span>

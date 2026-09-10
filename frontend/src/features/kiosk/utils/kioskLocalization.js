@@ -7,7 +7,7 @@
 export const kioskStrings = {
   // 1. English
   en: {
-    welcome: 'Welcome to MultiSpecialist Hospital',
+    welcome: 'Welcome to Medikiosk',
     subtitle: 'Your health journey starts here.',
     description: 'We will guide you through a few simple questions before your consultation.',
     hear: 'Hear Instructions',
@@ -20,8 +20,8 @@ export const kioskStrings = {
     language: 'Language',
     selectLanguage: 'Select Your Language',
     patientDashboard: 'Patient Dashboard',
-    speechText: 'Welcome to MultiSpecialist Hospital. We will guide you through a few simple questions before your consultation. Press Start Consultation when you are ready.',
-    copyright: '© 2026 MultiSpecialist Hospital',
+    speechText: 'Welcome to Medikiosk. We will guide you through a few simple questions before your consultation. Press Start Consultation when you are ready.',
+    copyright: '© 2026 Medikiosk',
 
     phases: {
       chief_complaint: {
@@ -63,7 +63,7 @@ export const kioskStrings = {
     connectionNotice: 'Connection Notice',
     retry: 'Retry',
     preparingConsultation: 'Preparing Your Consultation',
-    connectingEngine: 'Connecting securely to the MultiSpecialist clinical evaluation engine...',
+    connectingEngine: 'Connecting securely to the Medikiosk clinical evaluation engine...',
     loadingQuestion: 'Loading next question...',
     orAnswerTouch: 'Or answer with touch below',
 
@@ -152,7 +152,7 @@ export const kioskStrings = {
     savingConsent: 'Saving consent...',
     audioConfirmed: 'Audio instructions confirmed',
     consentSpeech: `Welcome. Before we begin, we need your permission to collect and process your health information. During this session, we will collect your spoken answers and symptom information using Module A, any medical documents you upload using Module B, and generate a clinical summary using Module C. This information will be used only to support your consultation with our doctors today. You may decline at any time. Press "I Consent" to continue, or "Decline" to exit.`,
-    policyFooter: 'MultiSpecialist Hospital • Patient Data Protection Policy'
+    policyFooter: 'Medikiosk • Patient Data Protection Policy'
   },
 
   // 2. Hindi (hi)

@@ -645,7 +645,7 @@ export default function SummaryReviewPage() {
 
       {/* ── FOOTER ── */}
       <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
-        <p>MultiSpecialist Hospital Clinical Review • Powered by Module C LLM Summarizer</p>
+        <p>Medikiosk Clinical Review • Powered by Module C LLM Summarizer</p>
       </footer>
     </div>
   );

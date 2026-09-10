@@ -595,7 +595,7 @@ export default function TriageAlertScreen() {
 
       {/* ── FOOTER DESK SUMMARY ── */}
       <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
-        <p>MultiSpecialist Hospital Triage Live Alert Screen • Connected to Person 1's Live Channel</p>
+        <p>Medikiosk Triage Live Alert Screen • Connected to Person 1's Live Channel</p>
       </footer>
     </div>
   );

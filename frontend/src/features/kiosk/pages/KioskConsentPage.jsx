@@ -215,14 +215,13 @@ export default function KioskConsentPage() {
           </h2>
           <div className="space-y-3 mb-6">
             {[
-              { icon: <FaMicrophone />, label: strings.moduleA, desc: strings.moduleADesc },
-              { icon: <FaFileLines />, label: strings.moduleB, desc: strings.moduleBDesc },
-              { icon: <FaBrain />, label: strings.moduleC, desc: strings.moduleCDesc }
+              { icon: <FaMicrophone />, desc: strings.moduleADesc },
+              { icon: <FaFileLines />, desc: strings.moduleBDesc },
+              { icon: <FaBrain />, desc: strings.moduleCDesc }
             ].map(item => (
-              <div key={item.label} className="flex items-start gap-3 bg-white/5 rounded-xl p-3">
+              <div key={item.desc} className="flex items-start gap-3 bg-white/5 rounded-xl p-3">
                 <div className="text-teal-400 mt-0.5 flex-shrink-0">{item.icon}</div>
                 <div>
-                  <span className="text-white font-semibold text-sm">{item.label}: </span>
                   <span className="text-slate-300 text-sm">{item.desc}</span>
                 </div>
               </div>

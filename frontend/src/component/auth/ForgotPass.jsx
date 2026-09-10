@@ -65,8 +65,7 @@ export default function ForgotPass() {
             <FaHospital className="text-white text-xl" />
           </div>
           <div>
-            <div className="font-black text-white text-lg leading-tight">MultiSpecialist</div>
-            <div className="text-xs text-teal-100 font-bold tracking-widest">HOSPITAL</div>
+            <div className="font-black text-white text-lg leading-tight">Medikiosk</div>
           </div>
         </div>
 
@@ -98,7 +97,7 @@ export default function ForgotPass() {
 
         {/* Bottom note */}
         <div className="relative z-10 text-xs text-teal-100/70 text-center">
-          © 2026 MultiSpecialist Hospital · All Rights Reserved
+          © 2026 Medikiosk · All Rights Reserved
         </div>
       </div>
 
@@ -112,8 +111,7 @@ export default function ForgotPass() {
               <FaHospital className="text-white" />
             </div>
             <div>
-              <div className="font-black text-slate-800 text-base leading-tight">MultiSpecialist</div>
-              <div className="text-xs text-teal-600 font-bold tracking-widest">HOSPITAL</div>
+              <div className="font-black text-slate-800 text-base leading-tight">Medikiosk</div>
             </div>
           </div>
 

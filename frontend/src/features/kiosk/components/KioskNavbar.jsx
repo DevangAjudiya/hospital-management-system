@@ -35,8 +35,7 @@ export default function KioskNavbar({
             <FaHospital className="text-xl" />
           </div>
           <div>
-            <div className="font-black text-slate-800 text-base leading-tight">MultiSpecialist</div>
-            <div className="text-xs text-teal-600 font-semibold tracking-wider leading-tight">HOSPITAL</div>
+            <div className="font-black text-slate-800 text-base leading-tight">Medikiosk</div>
           </div>
         </div>
 

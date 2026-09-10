@@ -1,5 +1,5 @@
 /**
- * Language Service for MultiSpecialist Kiosk
+ * Language Service for Medikiosk
  * 
  * Defines the supported languages and their configuration matching the
  * IndicTrans2 translation service (ai4bharat/indictrans2-en-indic-dist-200M)

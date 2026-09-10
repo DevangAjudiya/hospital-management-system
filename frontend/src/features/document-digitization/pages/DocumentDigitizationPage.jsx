@@ -124,8 +124,7 @@ export default function DocumentDigitizationPage() {
             🏥
           </div>
           <div>
-            <h1 className="font-bold text-lg text-slate-800 leading-none">MultiSpecialist</h1>
-            <span className="text-xs text-teal-600 font-semibold tracking-wide">HOSPITAL</span>
+            <h1 className="font-bold text-lg text-slate-800 leading-none">Medikiosk</h1>
           </div>
         </div>
 

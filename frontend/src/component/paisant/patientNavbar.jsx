@@ -97,11 +97,7 @@ export default function PatientNavbar({
 
             <div>
               <div className="font-black text-slate-800 text-base leading-tight">
-                MultiSpecialist
-              </div>
-
-              <div className="text-xs text-teal-600 font-semibold tracking-wider leading-tight">
-                HOSPITAL
+                Medikiosk
               </div>
             </div>
           </div>

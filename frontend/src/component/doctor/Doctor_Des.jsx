@@ -295,8 +295,7 @@ export default function Doctor_Des() {
               <FaHospital className="text-white text-base" />
             </div>
             <div>
-              <div className="font-black text-slate-800 text-sm leading-tight">MultiSpecialist</div>
-              <div className="text-[10px] text-teal-600 font-bold tracking-widest leading-tight">HOSPITAL</div>
+              <div className="font-black text-slate-800 text-sm leading-tight">Medikiosk</div>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-full px-5 py-1.5">
@@ -892,7 +891,7 @@ export default function Doctor_Des() {
               <FaHospital className="text-white text-base" />
             </div>
             <div>
-              <div className="font-black text-white text-sm leading-tight">MultiSpecialist Hospital</div>
+              <div className="font-black text-white text-sm leading-tight">Medikiosk</div>
               <div className="text-[10px] text-teal-400 font-bold tracking-widest">DOCTOR PORTAL · {doctor.name}</div>
             </div>
           </div>
@@ -907,7 +906,7 @@ export default function Doctor_Des() {
               <FaMapMarkerAlt className="text-teal-500 text-xs" /> Surat, Gujarat
             </span>
           </div>
-          <p className="text-xs text-slate-500">© 2026 MultiSpecialist Hospital · All Rights Reserved</p>
+          <p className="text-xs text-slate-500">© 2026 Medikiosk · All Rights Reserved</p>
         </div>
       </footer>
     </div>
