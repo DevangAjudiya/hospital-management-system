@@ -7,10 +7,13 @@ export default defineConfig({
     react(),
     tailwindcss()
   ],
+
   server: {
+    host: '0.0.0.0',
+
     proxy: {
       '/api': {
-        target: 'http://backend:8080', 
+        target: 'http://backend:8080',
         changeOrigin: true,
       },
     },

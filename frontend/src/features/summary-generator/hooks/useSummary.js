@@ -157,7 +157,8 @@ export function useSummary(patientId = null) {
     setActiveLang('hi');
 
     if (!summary) return;
-    if (summary.languageOutputs?.hi) return; // already translated
+    const cachedHi = summary.languageOutputs?.hi;
+    if (cachedHi && !cachedHi.startsWith('[Translation Error')) return; // already translated
 
     setHindiLoading(true);
 

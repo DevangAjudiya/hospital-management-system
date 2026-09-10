@@ -7,10 +7,16 @@ from IndicTransToolkit.processor import IndicProcessor
 
 MODEL_NAME = "ai4bharat/indictrans2-en-indic-dist-200M"
 print("Loading IndicTrans2 model... (first run downloads weights, be patient)")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, trust_remote_code=True)
-ip = IndicProcessor(inference=True)
-print("IndicTrans2 model loaded.")
+try:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, trust_remote_code=True)
+    ip = IndicProcessor(inference=True)
+    print("IndicTrans2 model loaded.")
+except Exception as load_err:
+    print(f"[IndicTrans2] model load failed: {load_err}, running with GoogleTranslator fallback only")
+    tokenizer = None
+    model = None
+    ip = None
 
 try:
     from deep_translator import GoogleTranslator
@@ -33,6 +39,8 @@ def translate_text(req: TranslateRequest):
 
     # Try IndicTrans2 model first
     try:
+        if model is None:
+            raise RuntimeError("IndicTrans2 model not loaded")
         batch = ip.preprocess_batch([text], src_lang=req.src_lang, tgt_lang=req.tgt_lang)
         if batch is None or len(batch) == 0:
             raise ValueError("preprocess_batch returned None or empty")

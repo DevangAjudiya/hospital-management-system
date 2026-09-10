@@ -36,3 +36,9 @@ frontend/node_modules/
 
 .env
 indictrans-service/venv-translate/
+
+# Python (indictrans-service)
+indictrans-service/.venv/
+indictrans-service/venv/
+__pycache__/
+*.pyc
